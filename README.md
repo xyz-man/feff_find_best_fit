@@ -10,8 +10,9 @@
 
 ## Description
 
-**[FEFF9](http://feff.phys.washington.edu/feffproject-feff.html) find best fit** this is a cli app for compare theoretical and experimental spectra and find the best fit for 
-their linear combinations.
+**[FEFF9](http://feff.phys.washington.edu/feffproject-feff.html) find best fit** this  is a cli app for comparing 
+theoretical and experimental spectra and finding the best fit of linear combinations of theoretical spectra to their 
+respective experimental spectra.
 
 
 ## Features
