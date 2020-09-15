@@ -9,6 +9,7 @@ from pkg_lib.pkg_files.dir_and_file_operations import PROJECT_ROOT_DIRECTORY_PAT
 import os
 from pathlib import Path
 from pkg_lib.pkg_bases.class_base import print_object_properties_value_in_table_form
+import numpy as np
 
 
 class Configuration:
@@ -19,9 +20,24 @@ class Configuration:
     PATH_TO_LOCAL_DATA_DIRECTORY = None
     PATH_TO_LOCAL_TMP_DIRECTORY = None
 
-    EXPERIMENT_SPECTRA_FILE_NAME = EXPERIMENT_SPECTRA_FILE_NAME
+    EXPERIMENTAL_SPECTRA_FILE_NAME = EXPERIMENTAL_SPECTRA_FILE_NAME
     PATH_TO_EXPERIMENT_SPECTRA_FILE = None
     PATH_TO_THEORY_SPECTRA_DIRECTORY = PATH_TO_THEORY_SPECTRA_DIRECTORY
+
+    THEORETICAL_SPECTRUM_COLUMN_NUMBER_X = 1
+    THEORETICAL_SPECTRUM_COLUMN_NUMBER_Y = 3
+
+    EXPERIMENTAL_SPECTRUM_X_SHIFT = -541.99
+    EXPERIMENTAL_SPECTRUM_Y_SHIFT = -1.865
+    EXPERIMENTAL_SPECTRUM_Y_SCALE = 0.853
+
+    SPECTRUM_CALCULATION_X_MIN = -12.5
+    SPECTRUM_CALCULATION_X_MAX = 40
+    SPECTRUM_CALCULATION_X_STEP_SIZE = 0.05
+    # region for data operation:
+    SPECTRUM_CALCULATION_X_REGION = None
+    # region for calculating R-factor:
+    SPECTRUM_CALCULATION_R_FACTOR_REGION = np.array([-11, 25])
 
     @classmethod
     def validate_input_data(cls):
@@ -67,6 +83,12 @@ class Configuration:
     #             cls.PATH_TO_CONFIGURATION_DIRECTORY,
     #             'batch_inp',
     #             cls.SRC_SLURM_RUN_FILE_NAME)
+    @classmethod
+    def create_calculation_region(cls):
+        x_min = cls.SPECTRUM_CALCULATION_X_MIN
+        x_max = cls.SPECTRUM_CALCULATION_X_MAX
+        step = cls.SPECTRUM_CALCULATION_X_STEP_SIZE
+        cls.SPECTRUM_CALCULATION_X_REGION = np.r_[x_min: x_max + step: step]
 
     @classmethod
     def init(cls):
@@ -74,8 +96,9 @@ class Configuration:
         cls.PATH_TO_EXPERIMENT_SPECTRA_FILE = os.path.join(
             cls.PATH_TO_LOCAL_DATA_DIRECTORY,
             'experiment',
-            cls.EXPERIMENT_SPECTRA_FILE_NAME
+            cls.EXPERIMENTAL_SPECTRA_FILE_NAME
         )
+        cls.create_calculation_region()
         # cls.init_feff_input_file()
         # cls.init_slurm_run_file()
 
