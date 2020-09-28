@@ -39,6 +39,8 @@ class Configuration:
     # region for calculating R-factor:
     SPECTRUM_CALCULATION_R_FACTOR_REGION = np.array([-11, 25])
 
+    STORED_VARIABLES_OF_THEORETICAL_CALCULATED_SPECTRA_FILE_NAME = 'vars_configuration.pckl'
+
     @classmethod
     def validate_input_data(cls):
         try:

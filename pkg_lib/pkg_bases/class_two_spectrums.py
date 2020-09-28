@@ -9,6 +9,7 @@ from collections import OrderedDict as odict
 import numpy as np
 from scipy.optimize import differential_evolution
 import prettytable as pt
+from copy import copy, deepcopy
 
 
 class DoubleCurves(BaseClass):
@@ -18,14 +19,22 @@ class DoubleCurves(BaseClass):
         self.ideal_curve_in_selected_region = Curve()
         self.probe_curve_in_selected_region = Curve()
         self.r_factor_region = Configuration.SPECTRUM_CALCULATION_R_FACTOR_REGION
+        self.r_region_vector = None
         self.optimized_params = [0, 0, 0]
+
+        self.out_directory_name = None
 
     def update_variables(self):
         self.probe_curve.transform_curve()
         self.ideal_curve.transform_curve()
 
-        x1, y1 = self.select_points_in_region(self.ideal_curve.new_coordinate.x, self.ideal_curve.new_coordinate.y)
-        x2, y2 = self.select_points_in_region(self.probe_curve.new_coordinate.x, self.probe_curve.new_coordinate.y)
+        ideal_x = copy(self.ideal_curve.new_coordinate.x)
+        ideal_y = copy(self.ideal_curve.new_coordinate.y)
+
+        probe_x, probe_y = copy(self.probe_curve.new_coordinate.x), copy(self.probe_curve.new_coordinate.y)
+
+        x1, y1, _ = self.select_points_in_region(ideal_x, ideal_y)
+        x2, y2, self.r_region_vector = self.select_points_in_region(probe_x, probe_y)
 
         x_interp, y1_out, y2_out = self.interpolate_arrays_to_equal_length(x1, y1, x2, y2)
 
@@ -80,10 +89,12 @@ class DoubleCurves(BaseClass):
         # out_y = y[indexMin:indexMax]
 
         # replace by numba.jit
-        out_x, out_y = numba_select_points_in_region(np.asarray(x_vector), np.asarray(y_vector), np.asarray(
-            self.r_factor_region, dtype=float))
+        out_x, out_y, r_region_vector = numba_select_points_in_region(np.asarray(x_vector),
+                                                                      np.asarray(y_vector),
+                                                                      np.asarray(self.r_factor_region, dtype=float)
+                                                                      )
 
-        return out_x, out_y
+        return out_x, out_y, r_region_vector
 
     @staticmethod
     def interpolate_arrays_to_equal_length(x1, y1, x2, y2):
@@ -177,6 +188,53 @@ class DoubleCurves(BaseClass):
         )
         print(table)
 
+    def save_curves_to_ascii_file(self):
+        if self.out_directory_name is None:
+            self.out_directory_name = Configuration.PATH_TO_LOCAL_TMP_DIRECTORY
+
+        if self.ideal_curve.curve_label is None:
+            self.ideal_curve.curve_label = 'Ideal Curve'
+
+        if self.probe_curve.curve_label is None:
+            self.probe_curve.curve_label = 'Probe Curve'
+
+        header_txt = 'R-factor region is [{}, {}]\n'.format(
+            self.r_factor_region[0],
+            self.r_factor_region[1],
+        )
+        header_txt += 'R-factor = {rf:0.6f}, S2 = {s2:0.6f}\n' \
+                      'Y-scale factor = {ys:0.6f}, X-shift = {xsh:0.6f}, ' \
+                      'Y-shift = {ysh:0.6f}\n'.format(
+                                                    rf=self.get_r_factor(),
+                                                    s2=self.get_sigma_squared(),
+                                                    ys=self.optimized_params[0],
+                                                    xsh=self.optimized_params[1],
+                                                    ysh=self.optimized_params[2],
+                                                    )
+        header_txt += 'Energy(eV)\tR-region\t{ideal}\t{probe}\toptim:{ideal}\toptim:{probe}'.format(
+            ideal=self.ideal_curve.curve_label,
+            probe=self.probe_curve.curve_label,
+        ).replace(' ', '_')
+        num_of_rows = len(self.probe_curve.new_coordinate.x)
+        out_array = np.zeros((num_of_rows, 6))
+        # Energy (eV):
+        out_array[:, 0] = self.probe_curve.new_coordinate.x
+        # R-region:
+        out_array[:, 1] = self.r_region_vector
+        # ideal:
+        out_array[:, 2] = self.ideal_curve.src_coordinate.y
+        # probe:
+        out_array[:, 3] = self.probe_curve.src_coordinate.y
+        # optim:probe:
+        out_array[:, 4] = self.ideal_curve.new_coordinate.y
+        # optim:probe:
+        out_array[:, 5] = self.probe_curve.new_coordinate.y
+
+        np.savetxt(os.path.join(self.out_directory_name,
+                                f'{self.probe_curve.curve_label}.txt'.replace(' ', '_')),
+                   out_array, fmt='%1.6e',
+                   delimiter='\t', header=header_txt)
+
 
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
@@ -198,20 +256,25 @@ if __name__ == '__main__':
 
     obj_2d.probe_curve.src_coordinate.x = obj.src_coordinate.x
     obj_2d.probe_curve.src_coordinate.y = obj.src_coordinate.y
-    obj_2d.probe_curve.transform_coefficient.shift_factor.y = -0.05
-    obj_2d.probe_curve.curve_label_latex = 'ZnO_ideal_p=[100]'
+    obj_2d.probe_curve.transform_coefficient.shift_factor.x = 1.5
+    obj_2d.probe_curve.transform_coefficient.shift_factor.y = 1.5
+    obj_2d.probe_curve.curve_label_latex = 'ZnO_theor_p=[100]'
+    # obj_2d.plot_probe_curve()
 
     obj_2d.update_variables()
     obj_2d.plot_two_curves()
     obj_2d.show_optimum()
 
     obj_2d.optimize_probe_curve_params()
+    obj_2d.save_curves_to_ascii_file()
 
     obj_2d.show_optimum()
-    obj_2d.probe_curve.curve_label_latex = 'opt:ZnO_ideal_p=[100]'
-    obj_2d.plot_two_curves()
+    obj_2d.probe_curve.curve_label_latex = 'opt:ZnO_theor_p=[100]'
+    # obj_2d.plot_two_curves()
+    obj_2d.plot_probe_curve()
     plt.legend()
     plt.show()
+    obj_2d.show_properties()
 
 
 

@@ -5,6 +5,8 @@
 '''
 import logging
 import os
+import matplotlib as mpl
+# mpl.use('Agg')
 from pkg_lib.pkg_bases.class_base import BaseClass
 from pkg_lib.pkg_files.load_data_from_file import *
 import matplotlib.pyplot as plt
@@ -13,7 +15,7 @@ import numba
 from copy import deepcopy
 
 
-@numba.jit('Tuple((f8[:], f8[:]))(f8[:], f8[:], f8[:])', cache=True)
+@numba.jit('Tuple((f8[:], f8[:], f8[:]))(f8[:], f8[:], f8[:])', cache=True)
 def numba_select_points_in_region(x, y, r_factor_region):
     # select only the points (X,Y) in the region:
     index_min = (np.abs(x - r_factor_region[0])).argmin()
@@ -22,7 +24,11 @@ def numba_select_points_in_region(x, y, r_factor_region):
     out_y = np.empty_like(out_x)
     out_x = x[index_min:index_max]
     out_y = y[index_min:index_max]
-    return out_x, out_y
+    r_region = y
+    r_region[0: index_min] = 0
+    r_region[index_max: ] = 0
+    # r_region is eq to y inside the r_factor_region and eq to 0 outside the region
+    return out_x, out_y, r_region
 
 
 @numba.jit('f8(f8[:], f8[:])', cache=True)
@@ -50,11 +56,10 @@ def get_r_factor_numba_v(y_ideal, y_probe):
 
 
 def update_one_value_to_another_value(a, b):
-    if a is not None and b is None:
+    if (a is not None) and (b is None):
         b = deepcopy(a)
-    if b is not None and a is None:
-       a = deepcopy(b)
-
+    if (b is not None) and (a is None):
+        a = deepcopy(b)
     return a, b
 
 
@@ -138,6 +143,11 @@ class Curve(BaseClass):
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
     from pkg_lib.pkg_files.load_data_from_file import load_experimental_data
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+
     obj = Curve()
     file_path1 = os.path.join(
         Configuration.PATH_TO_LOCAL_DATA_DIRECTORY, 'tmp_theoretical', 'ZnO_ideal_p=[100]_0001', 'xmu.dat')
@@ -180,7 +190,8 @@ if __name__ == '__main__':
     # obj.transform_coefficient.shift_factor.y = 0.5
 
     plt.legend()
-    plt.show()
+    fig.savefig('temp.png')
+    # plt.show()
 
     # obj.src_coordinate.x = np.r_[-20:40.05:0.05]
     # obj.src_coordinate.y = np.sin(obj.src_coordinate.x)
