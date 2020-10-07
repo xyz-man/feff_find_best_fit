@@ -14,6 +14,7 @@ from copy import copy, deepcopy
 
 class DoubleCurves(BaseClass):
     def __init__(self):
+        self.figure = plt.figure()
         self.ideal_curve = Curve()
         self.probe_curve = Curve()
         self.ideal_curve_in_selected_region = Curve()
@@ -46,6 +47,17 @@ class DoubleCurves(BaseClass):
 
         self.probe_curve_in_selected_region.transform_curve()
         self.ideal_curve_in_selected_region.transform_curve()
+
+    def plot_probe_curve_in_selected_region(self, line_width=2, alpha=1.0, is_label=True):
+        vector_x = self.probe_curve_in_selected_region.new_coordinate.x
+        vector_y = self.probe_curve_in_selected_region.new_coordinate.y
+        lbl = self.probe_curve.curve_label_latex
+        if is_label:
+            plt.plot(vector_x, vector_y, lw=line_width, alpha=alpha, label=lbl)
+        else:
+            plt.plot(vector_x, vector_y, lw=line_width, alpha=alpha, label=None)
+        plt.ylabel('$\mu(E)$', fontsize=20, fontweight='bold')
+        plt.xlabel('$E$ $[eV]$', fontsize=20, fontweight='bold')
 
     def plot_probe_curve(self, line_width=2, alpha=1.0, is_label=True):
         self.update_variables()
@@ -235,6 +247,13 @@ class DoubleCurves(BaseClass):
                    out_array, fmt='%1.6e',
                    delimiter='\t', header=header_txt)
 
+    def save_figure_to_png(self):
+        plt.legend()
+        plt.draw()
+        plt.show()
+        self.figure.savefig(os.path.join(self.out_directory_name,
+                                f'{self.probe_curve.curve_label}.png'.replace(' ', '_')),)
+
 
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
@@ -268,6 +287,7 @@ if __name__ == '__main__':
     obj_2d.optimize_probe_curve_params()
     obj_2d.save_curves_to_ascii_file()
 
+
     obj_2d.show_optimum()
     obj_2d.probe_curve.curve_label_latex = 'opt:ZnO_theor_p=[100]'
     # obj_2d.plot_two_curves()
@@ -275,6 +295,7 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
     obj_2d.show_properties()
+    obj_2d.save_figure_to_png()
 
 
 

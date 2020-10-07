@@ -42,6 +42,5 @@ if __name__ == '__main__':
     file_path3 = r'/mnt/nfsv4/abel_share/free_share/ZnO/ZnO_ideal_p=[103]_0001/xmu.dat'
     exp_data_path2 = os.path.join(
         Configuration.PATH_TO_LOCAL_DATA_DIRECTORY, 'experiment', 'experiment_ZnO_O-Kedge_[0,45,75].dat')
-    chi1 = load_experimental_data(file_path1)
-    chi2 = load_experimental_data(file_path2)
-    chi2 = load_experimental_data(file_path2)
+    chi1 = load_theoretical_xmu_data(file_path1)
+    chi2 = load_theoretical_xmu_data(file_path2)

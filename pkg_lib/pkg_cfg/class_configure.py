@@ -121,7 +121,6 @@ except Exception as e:
     print('===='*10)
 
 
-
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
     Configuration.show_properties()
