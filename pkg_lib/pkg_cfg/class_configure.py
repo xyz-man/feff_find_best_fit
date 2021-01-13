@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 from pkg_lib.pkg_bases.class_base import print_object_properties_value_in_table_form
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Configuration:
@@ -34,12 +35,16 @@ class Configuration:
     SPECTRUM_CALCULATION_X_MIN = -12.5
     SPECTRUM_CALCULATION_X_MAX = 40
     SPECTRUM_CALCULATION_X_STEP_SIZE = 0.05
+    SPECTRUM_CALCULATION_X_STEP_SIZE = 0.5
     # region for data operation:
     SPECTRUM_CALCULATION_X_REGION = None
     # region for calculating R-factor:
     SPECTRUM_CALCULATION_R_FACTOR_REGION = np.array([-11, 25])
 
     STORED_VARIABLES_OF_THEORETICAL_CALCULATED_SPECTRA_FILE_NAME = 'vars_configuration.pckl'
+
+    DPI = plt.rcParams['figure.dpi'] #get the default dpi value
+    FIGURE_GEOMETRY = (1920, 20, 1920, 1180)
 
     @classmethod
     def validate_input_data(cls):

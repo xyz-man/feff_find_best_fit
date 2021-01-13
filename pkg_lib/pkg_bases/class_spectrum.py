@@ -28,7 +28,37 @@ def numba_select_points_in_region(x, y, r_factor_region):
     r_region[0: index_min] = 0
     r_region[index_max: ] = 0
     # r_region is eq to y inside the r_factor_region and eq to 0 outside the region
-    return out_x, out_y, r_region
+    return out_x, out_y, r_region, index_min, index_max
+
+
+def get_points_and_indices_in_region(x_vector=None, y_vector=None, r_factor_region=None):
+    '''
+    return arrays of points from two input X,Y vectors.
+    :param x_vector:
+    :param y_vector:
+    :param r_factor_region: if is None then the Configuration.SPECTRUM_CALCULATION_R_FACTOR_REGION
+    :return:
+    out_x - cropped X vector,
+    out_y - cropped Y vector,
+    y_in_r_region - vector the same length like Y but nas nonzero values only inside selected region,
+    index_min - min index value of selected region,
+    index_max - max index value of selected region
+    '''
+    # replace by numba.jit
+    out_x = None
+    out_y = None
+    y_in_r_region = None
+    index_min = None
+    index_max = None
+    if r_factor_region is None:
+        r_factor_region = Configuration.SPECTRUM_CALCULATION_R_FACTOR_REGION
+    if x_vector is not None and y_vector is not None:
+        out_x, out_y, y_in_r_region, index_min, index_max = numba_select_points_in_region(
+            np.asarray(x_vector),
+            np.asarray(y_vector),
+            np.asarray(r_factor_region, dtype=float)
+        )
+    return out_x, out_y, y_in_r_region, index_min, index_max
 
 
 @numba.jit('f8(f8[:], f8[:])', cache=True)
@@ -93,6 +123,8 @@ class Curve(BaseClass):
 
         self.is_src_plotted = False
 
+        self.axes = None
+
     def linear_transform(self, coordinates=None, scale=None, shift=None):
         if (coordinates is not None) and (scale is not None) and (shift is not None):
             return coordinates*scale + shift
@@ -124,20 +156,38 @@ class Curve(BaseClass):
             self.curve_label, self.curve_label_latex = \
                 update_one_value_to_another_value(self.curve_label, self.curve_label_latex)
 
-    def plot_curve(self):
+    def plot_curve(self, axes=None):
         self.update_label()
         self.transform_curve()
-        plt.plot(self.new_coordinate.x,
-                 self.new_coordinate.y,
-                 lw=2,
-                 label=self.curve_label_latex)
-        if self.is_src_plotted:
-            plt.plot(self.src_coordinate.x,
-                     self.src_coordinate.y,
+        if axes is None:
+            plt.plot(self.new_coordinate.x,
+                     self.new_coordinate.y,
                      lw=2,
-                     label='src:'+self.curve_label_latex)
+                     label=self.curve_label_latex)
+        else:
+            plt.axes(axes)
+            axes.plot(self.new_coordinate.x,
+                     self.new_coordinate.y,
+                     lw=2,
+                     label=self.curve_label_latex)
+        if self.is_src_plotted:
+            if axes is None:
+                plt.plot(self.src_coordinate.x,
+                         self.src_coordinate.y,
+                         lw=2,
+                         label='src:'+self.curve_label_latex)
+            else:
+                plt.axes(axes)
+                axes.plot(self.src_coordinate.x,
+                         self.src_coordinate.y,
+                         lw=2,
+                         label='src:'+self.curve_label_latex)
+
         plt.ylabel(self.label.y, fontsize=20, fontweight='bold')
         plt.xlabel(self.label.x, fontsize=20, fontweight='bold')
+        if axes is not None:
+            axes.set_ylabel(self.label.y, fontsize=20, fontweight='bold')
+            axes.set_xlabel(self.label.x, fontsize=20, fontweight='bold')
 
 
 if __name__ == '__main__':

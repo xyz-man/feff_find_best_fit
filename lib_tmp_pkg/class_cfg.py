@@ -73,6 +73,7 @@ def update_one_value_to_another_value(a, b):
 
     return a, b
 
+
 class Configuration:
     DEBUG = DEBUG
     ROOT_PROJECT_DIRECTORY_NAME = ROOT_PROJECT_DIRECTORY_NAME

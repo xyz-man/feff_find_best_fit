@@ -3,12 +3,13 @@
 * e-mail: yuginboy@gmail.com
 * Last modified: 16.09.2020
 '''
-import logging
+from loguru import logger
 import pickle
 import dill
 import pandas as pd
 import io
 import os
+from pkg_lib.pkg_bases.class_ExtendBase import ExtendBase
 from pkg_lib.pkg_bases.class_two_spectrums import *
 from pkg_lib.pkg_files.dir_and_file_operations import create_out_data_folder
 
@@ -33,7 +34,7 @@ def renamed_loads(pickled_bytes):
     return renamed_load(file_obj)
 
 
-class AverageCurves(BaseClass):
+class AverageCurves(ExtendBase):
     def __init__(self):
         self.working_directory_path = Configuration.PATH_TO_THEORY_SPECTRA_DIRECTORY
         self.file_name_of_stored_vars = Configuration.STORED_VARIABLES_OF_THEORETICAL_CALCULATED_SPECTRA_FILE_NAME
@@ -63,7 +64,7 @@ class AverageCurves(BaseClass):
         self.averaging_curve = DoubleCurves()
         self.list_of_unique_distance = []
         # max distance to create average spectra:
-        self.average_distance = 10
+        self.average_distance = 15
         self.number_of_spectra_for_average = 0
         # this number is needed to calculate the average spectra, so we summarize twice all the spectra for which the
         # distance is less than the maximum and only once the spectra for this maximum distance.
@@ -92,28 +93,8 @@ class AverageCurves(BaseClass):
                 logging.getLogger("error_logger").error(error_txt + repr(err))
                 if Configuration.DEBUG:
                     print(error_txt, repr(err))
-
-    def load_experimental_curve(self):
-        data = load_experimental_data()
-        self.experimental_curve.src_coordinate.x = data[:, 0]
-        self.experimental_curve.src_coordinate.y = data[:, 1]
-        self.experimental_curve.curve_label_latex = 'ZnO-0deg'
-        self.experimental_curve.label.x = 'Energy,[eV]'
-        self.experimental_curve.label.y = 'Intensity,[a.u.]'
-        # self.experimental_curve.plot_curve()
-        # plt.draw()
-
-        # self.experimental_curve.src_coordinate.x = data[:, 0]
-        # self.experimental_curve.src_coordinate.y = data[:, 2]
-        # self.experimental_curve.curve_label_latex = 'ZnO-45deg'
-        # self.experimental_curve.plot_curve()
-        # plt.draw()
-        #
-        # self.experimental_curve.src_coordinate.x = data[:, 0]
-        # self.experimental_curve.src_coordinate.y = data[:, 3]
-        # self.experimental_curve.curve_label_latex = 'ZnO-75deg'
-        # self.experimental_curve.plot_curve()
-        # plt.draw()
+                    logger.debug(error_txt)
+                    logger.debug(err)
 
     def load_curves_to_dict(self):
         if self.stored_vars_data is not None:
@@ -165,7 +146,7 @@ class AverageCurves(BaseClass):
                 # self.current_curve.plot_curve()
                 # plt.draw()
 
-            self.list_of_unique_distance = np.unique(self.list_of_unique_distance)
+            self.list_of_unique_distance = np.unique(np.round(self.list_of_unique_distance, 5))
             print(self.list_of_unique_distance)
 
     def create_average_spectrum(self):
@@ -213,12 +194,12 @@ class AverageCurves(BaseClass):
                                     self.averaging_curve.probe_curve.new_coordinate.y,
                                 )
                             )
-                            self.array_of_theoretical_y_coordinates = np.vstack(
-                                (
-                                    self.array_of_theoretical_y_coordinates,
-                                    self.averaging_curve.probe_curve.new_coordinate.y,
-                                )
-                            )
+                            # self.array_of_theoretical_y_coordinates = np.vstack(
+                            #     (
+                            #         self.array_of_theoretical_y_coordinates,
+                            #         self.averaging_curve.probe_curve.new_coordinate.y,
+                            #     )
+                            # )
 
                         if distance == self.max_distance_in_selected_spectra:
                             # summarize only once the spectra for this maximum distance:
@@ -245,6 +226,7 @@ class AverageCurves(BaseClass):
 
             self.averaging_curve.probe_curve.curve_label_latex = '<n={} spectra>, d={}'\
                 .format(m, self.current_distance)
+            self.averaging_curve.title = os.path.basename(self.working_directory_path)
             self.averaging_curve.plot_two_curves()
 
             self.averaging_curve.show_optimum()

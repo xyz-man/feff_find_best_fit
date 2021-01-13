@@ -17,6 +17,7 @@ class DoubleCurves(BaseClass):
         self.figure = plt.figure()
         self.ideal_curve = Curve()
         self.probe_curve = Curve()
+        self.title = None
         self.ideal_curve_in_selected_region = Curve()
         self.probe_curve_in_selected_region = Curve()
         self.r_factor_region = Configuration.SPECTRUM_CALCULATION_R_FACTOR_REGION
@@ -92,6 +93,9 @@ class DoubleCurves(BaseClass):
                              r=self.get_r_factor()*100, s2=self.get_sigma_squared()*100))
         plt.ylabel('$\mu(E)$', fontsize=20, fontweight='bold')
         plt.xlabel('$E$ $[eV]$', fontsize=20, fontweight='bold')
+        if self.title is None:
+            self.title = self.probe_curve.curve_label_latex
+        plt.title(self.title)
 
     def select_points_in_region(self, x_vector=None, y_vector=None):
         # select only the points (X,Y) in the region:
@@ -101,7 +105,7 @@ class DoubleCurves(BaseClass):
         # out_y = y[indexMin:indexMax]
 
         # replace by numba.jit
-        out_x, out_y, r_region_vector = numba_select_points_in_region(np.asarray(x_vector),
+        out_x, out_y, r_region_vector, _, _ = numba_select_points_in_region(np.asarray(x_vector),
                                                                       np.asarray(y_vector),
                                                                       np.asarray(self.r_factor_region, dtype=float)
                                                                       )
@@ -260,8 +264,11 @@ if __name__ == '__main__':
     obj_2d = DoubleCurves()
 
     obj = Curve()
+    # file_path1 = os.path.join(
+    #     Configuration.PATH_TO_LOCAL_DATA_DIRECTORY, 'tmp_theoretical', 'ZnO_ideal_p=[100]_0001', 'xmu.dat')
+
     file_path1 = os.path.join(
-        Configuration.PATH_TO_LOCAL_DATA_DIRECTORY, 'tmp_theoretical', 'ZnO_ideal_p=[100]_0001', 'xmu.dat')
+        Configuration.PATH_TO_LOCAL_DATA_DIRECTORY, '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+Ovac', 'xmu.dat')
 
     obj.src_coordinate.x, obj.src_coordinate.y = load_theoretical_xmu_data(file_path1)
     # obj.curve_label = 'ZnO_ideal_p=[100]'
@@ -275,9 +282,11 @@ if __name__ == '__main__':
 
     obj_2d.probe_curve.src_coordinate.x = obj.src_coordinate.x
     obj_2d.probe_curve.src_coordinate.y = obj.src_coordinate.y
-    obj_2d.probe_curve.transform_coefficient.shift_factor.x = 1.5
-    obj_2d.probe_curve.transform_coefficient.shift_factor.y = 1.5
+    # obj_2d.probe_curve.transform_coefficient.shift_factor.x = 1.5
+    # obj_2d.probe_curve.transform_coefficient.shift_factor.y = 1.5
     obj_2d.probe_curve.curve_label_latex = 'ZnO_theor_p=[100]'
+    obj_2d.probe_curve.curve_label = 'ZnO_theor_p=[100]'
+    obj_2d.title = 'ZnO - ideal structure, p=[100]'
     # obj_2d.plot_probe_curve()
 
     obj_2d.update_variables()
@@ -292,8 +301,8 @@ if __name__ == '__main__':
     obj_2d.probe_curve.curve_label_latex = 'opt:ZnO_theor_p=[100]'
     # obj_2d.plot_two_curves()
     obj_2d.plot_probe_curve()
-    plt.legend()
-    plt.show()
+    # plt.legend()
+    # plt.show()
     obj_2d.show_properties()
     obj_2d.save_figure_to_png()
 
