@@ -183,11 +183,11 @@ class Curve(BaseClass):
                          lw=2,
                          label='src:'+self.curve_label_latex)
 
-        plt.ylabel(self.label.y, fontsize=20, fontweight='bold')
-        plt.xlabel(self.label.x, fontsize=20, fontweight='bold')
+        plt.ylabel(self.label.y, fontsize=Configuration.FONTSIZE_Y_LABEL, fontweight='bold')
+        plt.xlabel(self.label.x, fontsize=Configuration.FONTSIZE_X_LABEL, fontweight='bold')
         if axes is not None:
-            axes.set_ylabel(self.label.y, fontsize=20, fontweight='bold')
-            axes.set_xlabel(self.label.x, fontsize=20, fontweight='bold')
+            axes.set_ylabel(self.label.y, fontsize=Configuration.FONTSIZE_Y_LABEL, fontweight='bold')
+            axes.set_xlabel(self.label.x, fontsize=Configuration.FONTSIZE_X_LABEL, fontweight='bold')
 
 
 if __name__ == '__main__':

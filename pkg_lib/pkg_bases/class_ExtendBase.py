@@ -26,15 +26,15 @@ class ExtendBase(BaseClass):
         # self.experimental_curve.plot_curve()
         # plt.draw()
 
-        # self.experimental_curve.src_coordinate.x = data[:, 0]
-        # self.experimental_curve.src_coordinate.y = data[:, 2]
-        # self.experimental_curve.curve_label_latex = 'ZnO-45deg'
+        self.experimental_curve.src_coordinate.x = data[:, 0]
+        self.experimental_curve.src_coordinate.y = data[:, 2]
+        self.experimental_curve.curve_label_latex = 'ZnO-45deg'
         # self.experimental_curve.plot_curve()
         # plt.draw()
         #
-        # self.experimental_curve.src_coordinate.x = data[:, 0]
-        # self.experimental_curve.src_coordinate.y = data[:, 3]
-        # self.experimental_curve.curve_label_latex = 'ZnO-75deg'
+        self.experimental_curve.src_coordinate.x = data[:, 0]
+        self.experimental_curve.src_coordinate.y = data[:, 3]
+        self.experimental_curve.curve_label_latex = 'ZnO-75deg'
         # self.experimental_curve.plot_curve()
         # plt.draw()
 

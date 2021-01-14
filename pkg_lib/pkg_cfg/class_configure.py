@@ -45,6 +45,8 @@ class Configuration:
 
     DPI = plt.rcParams['figure.dpi'] #get the default dpi value
     FIGURE_GEOMETRY = (1920, 20, 1920, 1180)
+    FONTSIZE_Y_LABEL = 15
+    FONTSIZE_X_LABEL = 15
 
     @classmethod
     def validate_input_data(cls):

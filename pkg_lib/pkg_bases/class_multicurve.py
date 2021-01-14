@@ -50,7 +50,7 @@ class MultiCurve(ExtendBase):
         self.dict_of_hash_and_curves_combinations_for_processing = odict()
         self.list_of_hash_combinations = None
         self.minimization_method = 'differential_evolution'
-        # self.minimization_method = 'minimize'
+        self.minimization_method = 'minimize'
         # variables for processing for each step of calculation:
         self.current_hash_list = None
         self.current_theoretical_y_coordinates = None
@@ -59,6 +59,8 @@ class MultiCurve(ExtendBase):
         self.current_r_factor = None
         self.current_sigma_squared = None
         self.current_optimized_params = None
+        self.current_txt = None
+        self.current_label = None
 
         self.dict_of_results = odict()
 
@@ -102,6 +104,8 @@ class MultiCurve(ExtendBase):
         for val in self.axes:
             for axis in ['top', 'bottom', 'left', 'right']:
                 val.spines[axis].set_linewidth(2)
+        # for axis in ['top', 'bottom', 'left', 'right']:
+        #     self.axes[0].spines[axis].set_linewidth(2)
         # plt.subplots_adjust(top=0.85)
         # gs1.tight_layout(fig, rect=[0, 0.03, 1, 0.95])
         self.figure.tight_layout(rect=[0.03, 0.03, 1, 0.95], w_pad=1.1)
@@ -333,7 +337,7 @@ class MultiCurve(ExtendBase):
 
     def run_fit_procedure_for_current_values(self):
         num = self.number_of_curve_directory_paths_for_fit
-        x0 = np.zeros(num)+0.5
+        x0 = np.zeros(num)
         # create bounds:
         bounds = []
         for i in x0:
@@ -380,9 +384,22 @@ class MultiCurve(ExtendBase):
                 deepcopy(self.current_theoretical_y_coordinates_in_r_factor_region)
 
             self.dict_of_results[num] = tmp_dict
+
+            self.current_txt = None
+            self.current_txt = 'R={rf:1.4f}, $\sigma^2$={sq:1.4f}\n'.format(
+                rf=self.current_r_factor,
+                sq=self.current_sigma_squared,
+            )
+            self.current_label = ''
             # plot curves
             for i, hs in enumerate(val_lst):
                 current_curve = self.get_curve_by_hash(hs)
+                # generate txt string:
+                self.current_label = self.current_label + '{0} x [ '.format(round(self.current_optimized_params[i],
+                                                                                 4)) + \
+                                     current_curve.curve_label_latex + ' ]'
+                if i < len(self.current_optimized_params) - 1:
+                    self.current_label = self.current_label + ' + \n'
                 current_curve.axes = self.axes[i + 1]
                 plt.axes(current_curve.axes)
                 plt.cla()
@@ -394,7 +411,31 @@ class MultiCurve(ExtendBase):
                 plt.draw()
                 plt.show()
 
+            self.current_txt = self.current_txt + self.current_label
+            self.plot_fit_resulted_curves()
+            plt.legend()
+            plt.draw()
+            plt.show()
+
     def plot_fit_resulted_curves(self):
+        axes = self.axes[0]
+        plt.axes(axes)
+        plt.cla()
+        self.experimental_curve.axes = axes
+        self.experimental_curve.plot_curve()
+        # plot theoretical result curve
+        x_coordinate = self.experimental_curve.src_coordinate.x
+        y_coordinate = self.current_theoretical_y_coordinates
+        axes.plot(x_coordinate,
+                  y_coordinate,
+                  lw=2,
+                  label=self.current_label)
+
+        y_coordinate = self.current_theoretical_y_coordinates_in_r_factor_region
+        axes.fill_between(x_coordinate, x_coordinate * 0, y_coordinate,
+                         alpha=0.2, edgecolor='#1B2ACC', facecolor='#089FFF',
+                         linewidth=0.5, linestyle='dashdot', antialiased=True, label='$R_{factor}$ region')
+        plt.title(self.current_txt)
 
     def save_current_curves_to_ascii_file(self):
         if self.out_directory_name is None:
@@ -451,13 +492,15 @@ if __name__ == '__main__':
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
+        '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
     ]
     obj.list_of_cut_parts_of_file_name = [
         'Ira',
         'Ira',
         'Ira',
+        'Ira',
     ]
-    obj.number_of_curve_directory_paths_for_fit = 2
+    obj.number_of_curve_directory_paths_for_fit = 4
 
     obj.setup_axes()
     obj.load_experimental_curve()
