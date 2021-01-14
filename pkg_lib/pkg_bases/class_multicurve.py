@@ -10,7 +10,8 @@ import itertools
 from scipy.optimize import minimize, minimize_scalar
 from scipy.optimize import differential_evolution
 from pprint import pprint
-
+from pkg_lib.pkg_files.dir_and_file_operations import *
+import shutil
 
 def get_list_without_duplicates(input_list=None):
     out = None
@@ -50,8 +51,8 @@ class MultiCurve(ExtendBase):
         self.dict_of_hash_and_curves_combinations_for_processing = odict()
         self.list_of_hash_combinations = None
         self.minimization_method = 'differential_evolution'
-        self.minimization_method = 'minimize'
-        # variables for processing for each step of calculation:
+        # self.minimization_method = 'minimize'
+        # variables for processing for each step of calculations:
         self.current_hash_list = None
         self.current_theoretical_y_coordinates = None
         self.current_experimental_y_coordinates_in_r_factor_region = None
@@ -61,6 +62,10 @@ class MultiCurve(ExtendBase):
         self.current_optimized_params = None
         self.current_txt = None
         self.current_label = None
+        self.current_out_directory_name = None
+        self.current_out_file_name = None
+
+        self.global_minimum_r_factor = 10
 
         self.dict_of_results = odict()
 
@@ -89,7 +94,7 @@ class MultiCurve(ExtendBase):
         plt.close('all')
         plt.switch_backend('QT5Agg', )
         plt.rc('font', family='serif')
-        self.figure = plt.figure()
+        self.figure = plt.figure(figsize=(np.array(Configuration.FIGURE_GEOMETRY[2:]))/Configuration.DPI)
         self.figure_manager = plt.get_current_fig_manager()
         gspec = gridspec.GridSpec(
             nrows=self.number_of_curve_directory_paths_for_fit, ncols=2, figure=self.figure)
@@ -108,7 +113,7 @@ class MultiCurve(ExtendBase):
         #     self.axes[0].spines[axis].set_linewidth(2)
         # plt.subplots_adjust(top=0.85)
         # gs1.tight_layout(fig, rect=[0, 0.03, 1, 0.95])
-        self.figure.tight_layout(rect=[0.03, 0.03, 1, 0.95], w_pad=1.1)
+        self.figure.tight_layout(rect=[0.03, 0.03, 1, 0.9], w_pad=1.1)
 
         # put window to the second monitor
         # figManager.window.setGeometry(1923, 23, 640, 529)
@@ -122,7 +127,6 @@ class MultiCurve(ExtendBase):
         # ax.plot( x, y_max, label = '$\chi(k)$ max', color = 'skyblue' )
         # ax.plot( x, y_min, label = '$\chi(k)$ min', color = 'lightblue' )
 
-        self.figure.tight_layout(rect=[0.03, 0.03, 1, 0.95], w_pad=1.1)
 
     def get_current_sub_multi_curve_by_id(self, idx=None):
         out = None
@@ -309,7 +313,7 @@ class MultiCurve(ExtendBase):
         result_hash_list_combinations_without_duplicates = remove_duplicates_from_list_of_tuples(
             result_hash_list_combinations_without_duplicates)
         logger.info(len(result_hash_list_combinations_without_duplicates))
-        logger.info(result_hash_list_combinations_without_duplicates)
+        # logger.info(result_hash_list_combinations_without_duplicates)
 
         self.list_of_hash_combinations = result_hash_list_combinations_without_duplicates
         return result_hash_list_combinations_without_duplicates
@@ -350,9 +354,9 @@ class MultiCurve(ExtendBase):
 
         # res_tmp = func(x0)
         if self.minimization_method == 'minimize':
-            res = minimize(func, x0=x0, bounds=bounds, options={'gtol': 1e-6, 'disp': True})
+            res = minimize(func, x0=x0, bounds=bounds, options={'gtol': 1e-8, 'disp': True})
         elif self.minimization_method == 'differential_evolution':
-            res = differential_evolution(func, bounds)
+            res = differential_evolution(func, bounds, tol=1e3)
 
         if np.sum(res.x) > 0:
             self.current_optimized_params = res.x / np.sum(res.x)
@@ -370,52 +374,66 @@ class MultiCurve(ExtendBase):
             self.current_hash_list = val_lst
             self.run_fit_procedure_for_current_values()
             self.get_sigma_squared()
-            tmp_dict = odict()
-            tmp_dict['r_factor'] = deepcopy(self.current_r_factor)
-            tmp_dict['sigma_squared'] = deepcopy(self.current_sigma_squared)
-            tmp_dict['hash_list'] = deepcopy(self.current_hash_list)
-            tmp_dict['optimized_params'] = deepcopy(self.current_optimized_params)
-            tmp_dict['x_coordinates'] = deepcopy(self.experimental_curve.src_coordinate.x)
-            tmp_dict['experimental_y_coordinates'] = deepcopy(self.experimental_curve.src_coordinate.y)
-            tmp_dict['experimental_y_coordinates_in_r_factor_region'] = \
-                deepcopy(self.current_experimental_y_coordinates_in_r_factor_region)
-            tmp_dict['theoretical_y_coordinates'] = deepcopy(self.current_theoretical_y_coordinates)
-            tmp_dict['theoretical_y_coordinates_in_r_factor_region'] = \
-                deepcopy(self.current_theoretical_y_coordinates_in_r_factor_region)
+            if self.is_global_minimum_r_factor():
+                tmp_dict = odict()
+                tmp_dict['r_factor'] = deepcopy(self.current_r_factor)
+                tmp_dict['sigma_squared'] = deepcopy(self.current_sigma_squared)
+                tmp_dict['hash_list'] = deepcopy(self.current_hash_list)
+                tmp_dict['optimized_params'] = deepcopy(self.current_optimized_params)
+                tmp_dict['x_coordinates'] = deepcopy(self.experimental_curve.src_coordinate.x)
+                tmp_dict['experimental_y_coordinates'] = deepcopy(self.experimental_curve.src_coordinate.y)
+                tmp_dict['experimental_y_coordinates_in_r_factor_region'] = \
+                    deepcopy(self.current_experimental_y_coordinates_in_r_factor_region)
+                tmp_dict['theoretical_y_coordinates'] = deepcopy(self.current_theoretical_y_coordinates)
+                tmp_dict['theoretical_y_coordinates_in_r_factor_region'] = \
+                    deepcopy(self.current_theoretical_y_coordinates_in_r_factor_region)
 
-            self.dict_of_results[num] = tmp_dict
+                self.dict_of_results[num] = tmp_dict
 
-            self.current_txt = None
-            self.current_txt = 'R={rf:1.4f}, $\sigma^2$={sq:1.4f}\n'.format(
-                rf=self.current_r_factor,
-                sq=self.current_sigma_squared,
-            )
-            self.current_label = ''
-            # plot curves
-            for i, hs in enumerate(val_lst):
-                current_curve = self.get_curve_by_hash(hs)
-                # generate txt string:
-                self.current_label = self.current_label + '{0} x [ '.format(round(self.current_optimized_params[i],
-                                                                                 4)) + \
-                                     current_curve.curve_label_latex + ' ]'
-                if i < len(self.current_optimized_params) - 1:
-                    self.current_label = self.current_label + ' + \n'
-                current_curve.axes = self.axes[i + 1]
-                plt.axes(current_curve.axes)
-                plt.cla()
-                self.experimental_curve.axes = self.axes[i + 1]
-                current_curve.plot_curve()
-                # self.experimental_curve.is_src_plotted = True
-                self.experimental_curve.plot_curve()
+                self.current_txt = None
+                self.current_txt = 'R={rf:1.7f}, $\sigma^2$={sq:1.7f}\n'.format(
+                    rf=self.current_r_factor,
+                    sq=self.current_sigma_squared,
+                )
+                self.current_label = ''
+                # plot curves
+                for i, hs in enumerate(self.current_hash_list):
+                    current_curve = self.get_curve_by_hash(hs)
+                    # generate txt string:
+                    self.current_label = self.current_label + '{0} x [ '.format(
+                        round(self.current_optimized_params[i], 5)
+                    ) + current_curve.curve_label_latex + ' ]'
+                    if i < len(self.current_optimized_params) - 1:
+                        self.current_label = self.current_label + ' + \n'
+                    current_curve.axes = self.axes[i + 1]
+                    plt.axes(current_curve.axes)
+                    plt.cla()
+                    self.experimental_curve.axes = self.axes[i + 1]
+                    current_curve.plot_curve()
+                    # self.experimental_curve.is_src_plotted = True
+                    self.experimental_curve.plot_curve()
+                    plt.legend()
+                    plt.draw()
+                    plt.show()
+
+                self.current_txt = self.current_txt + self.current_label
+                self.plot_fit_resulted_curves()
                 plt.legend()
                 plt.draw()
                 plt.show()
+                self.save_current_curves_to_ascii_and_png_files()
+        # copy the global minimum files into up directory:
+        if self.current_out_file_name is not None:
+            source = self.current_out_directory_name
+            destination = self.out_directory_name
+            shutil.copytree(source, destination, dirs_exist_ok=True)
 
-            self.current_txt = self.current_txt + self.current_label
-            self.plot_fit_resulted_curves()
-            plt.legend()
-            plt.draw()
-            plt.show()
+    def is_global_minimum_r_factor(self):
+        if self.current_r_factor <= self.global_minimum_r_factor:
+            self.global_minimum_r_factor = copy(self.current_r_factor)
+            return True
+        else:
+            return False
 
     def plot_fit_resulted_curves(self):
         axes = self.axes[0]
@@ -437,52 +455,87 @@ class MultiCurve(ExtendBase):
                          linewidth=0.5, linestyle='dashdot', antialiased=True, label='$R_{factor}$ region')
         plt.title(self.current_txt)
 
-    def save_current_curves_to_ascii_file(self):
+    def save_current_curves_to_ascii_and_png_files(self):
         if self.out_directory_name is None:
-            self.out_directory_name = Configuration.PATH_TO_LOCAL_TMP_DIRECTORY
+            # time.sleep(5)
+            self.out_directory_name = create_out_data_folder(
+                main_folder_path=Configuration.PATH_TO_LOCAL_TMP_DIRECTORY,
+                first_part_of_folder_name='multi-curves-fit-[{}]-[N={}]'.format(
+                    str(self.experimental_curve.curve_label_latex).replace(' ', '_'),
+                    self.number_of_curve_directory_paths_for_fit,
+                ),
+            )
 
         if self.experimental_curve.curve_label is None:
             self.experimental_curve.curve_label = 'Experiment'
 
-        if self.probe_curve.curve_label is None:
-            self.probe_curve.curve_label = 'Probe Curve'
+        num_of_rows = len(self.experimental_curve.src_coordinate.x)
+
+        out_array = np.zeros((num_of_rows, 5 + self.number_of_curve_directory_paths_for_fit))
+        # Energy (eV):
+        out_array[:, 0] = self.experimental_curve.src_coordinate.x
+        # experimental curve:
+        out_array[:, 1] = self.experimental_curve.src_coordinate.y
+        # R-region of experimental curve:
+        out_array[:, 2] = self.current_experimental_y_coordinates_in_r_factor_region
+        # theory fit result:
+        out_array[:, 3] = self.current_theoretical_y_coordinates
+        # R-region of theory fit result:
+        out_array[:, 4] = self.current_theoretical_y_coordinates_in_r_factor_region
 
         header_txt = 'R-factor region is [{}, {}]\n'.format(
             self.r_factor_region[0],
             self.r_factor_region[1],
         )
-        header_txt += 'R-factor = {rf:0.6f}, S2 = {s2:0.6f}\n' \
-                      'Y-scale factor = {ys:0.6f}, X-shift = {xsh:0.6f}, ' \
-                      'Y-shift = {ysh:0.6f}\n'.format(
-            rf=self.get_r_factor(),
-            s2=self.get_sigma_squared(),
-            ys=self.optimized_params[0],
-            xsh=self.optimized_params[1],
-            ysh=self.optimized_params[2],
+        header_txt = header_txt + 'minimization method: {}, number of fit models: {}\n'.format(
+            self.minimization_method,
+            self.number_of_curve_directory_paths_for_fit,
         )
-        header_txt += 'Energy(eV)\tR-region\t{ideal}\t{probe}\toptim:{ideal}\toptim:{probe}'.format(
-            ideal=self.ideal_curve.curve_label,
-            probe=self.probe_curve.curve_label,
-        ).replace(' ', '_')
-        num_of_rows = len(self.probe_curve.new_coordinate.x)
-        out_array = np.zeros((num_of_rows, 6))
-        # Energy (eV):
-        out_array[:, 0] = self.probe_curve.new_coordinate.x
-        # R-region:
-        out_array[:, 1] = self.r_region_vector
-        # ideal:
-        out_array[:, 2] = self.ideal_curve.src_coordinate.y
-        # probe:
-        out_array[:, 3] = self.probe_curve.src_coordinate.y
-        # optim:probe:
-        out_array[:, 4] = self.ideal_curve.new_coordinate.y
-        # optim:probe:
-        out_array[:, 5] = self.probe_curve.new_coordinate.y
+        header_txt = header_txt + 'list of theoretical spectra directories from which models were taken:\n'
+        for val in self.list_of_theoretical_spectra_directory_path:
+            header_txt += '\t' + val + '\n'
 
-        np.savetxt(os.path.join(self.out_directory_name,
-                                f'{self.probe_curve.curve_label}.txt'.replace(' ', '_')),
+        header_txt += self.current_txt + '\n\n'
+        columns_name_txt = 'Energy(eV)\t{exper}\tR-region: [{exper}]\t{num} models fit\tR-region: [{num} models fit]'. \
+            format(
+            exper=self.experimental_curve.curve_label_latex,
+            num=self.number_of_curve_directory_paths_for_fit,
+        )
+        for i, hs in enumerate(self.current_hash_list):
+            current_curve = self.get_curve_by_hash(hs)
+            # generate txt string:
+            columns_name_txt += '\t{}'.format(
+                current_curve.curve_label_latex,
+            )
+            # theory model y coordinate:
+            out_array[:, 5 + i] = current_curve.src_coordinate.y
+        header_txt += columns_name_txt
+
+        self.current_out_directory_name = create_out_data_folder(
+            main_folder_path=self.out_directory_name,
+            first_part_of_folder_name='out',
+        )
+        self.current_out_file_name = 'R={} [{}] fit by N={} models'.format(
+            round(self.current_r_factor, 5),
+            self.experimental_curve.curve_label_latex,
+            self.number_of_curve_directory_paths_for_fit,
+        ).replace(' ', '_')
+        np.savetxt(os.path.join(self.current_out_directory_name,
+                                self.current_out_file_name + '.txt'),
                    out_array, fmt='%1.6e',
                    delimiter='\t', header=header_txt)
+
+        # save to the PNG file:
+        plt.draw()
+        plt.show()
+        self.figure.savefig(os.path.join(self.current_out_directory_name,
+                                self.current_out_file_name + '.png'),
+                            dpi=Configuration.DPI,
+                            format='png',
+                            # bbox_inches='tight', pad_inches=0.5,
+                            )
+        logger.info(os.path.join(self.current_out_directory_name,
+                                self.current_out_file_name + '.png'))
 
 
 if __name__ == '__main__':
@@ -507,6 +560,7 @@ if __name__ == '__main__':
     obj.load_curves_to_dict_of_multi_curves_for_processing()
 
     obj.run_fit_procedure()
+    logger.info('finish multicurve fit')
 
     plt.legend()
     plt.show(block=True)

@@ -39,14 +39,14 @@ class Configuration:
     # region for data operation:
     SPECTRUM_CALCULATION_X_REGION = None
     # region for calculating R-factor:
-    SPECTRUM_CALCULATION_R_FACTOR_REGION = np.array([-11, 25])
+    SPECTRUM_CALCULATION_R_FACTOR_REGION = np.array([-11, 30])
 
     STORED_VARIABLES_OF_THEORETICAL_CALCULATED_SPECTRA_FILE_NAME = 'vars_configuration.pckl'
 
     DPI = plt.rcParams['figure.dpi'] #get the default dpi value
-    FIGURE_GEOMETRY = (1920, 20, 1920, 1180)
-    FONTSIZE_Y_LABEL = 15
-    FONTSIZE_X_LABEL = 15
+    FIGURE_GEOMETRY = (1920, 20, 1920, 1080)
+    FONTSIZE_Y_LABEL = 14
+    FONTSIZE_X_LABEL = 14
 
     @classmethod
     def validate_input_data(cls):
