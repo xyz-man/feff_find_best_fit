@@ -257,7 +257,7 @@ class MultiGroupCurve(ExtendBase):
                 tmp_dict['curves'] = deepcopy(self.current_multi_curve)
                 self.dict_of_multi_curves_for_processing[i] = tmp_dict
 
-                self.current_multi_curve.axes = self.axes[i+1]
+                self.current_multi_curve.axes = self.axes[1]
                 self.current_multi_curve.plot_curves()
                 self.current_multi_curve.axes.set_title(
                     self.list_of_cut_parts_of_file_name[i]
@@ -554,8 +554,7 @@ class MultiGroupCurve(ExtendBase):
 
                 # write Title:
                 self.current_title_txt = 'Total values: $\\mathbf{{R}}$={rf:1.7f}, $\\mathbf{{' \
-                                         '\sigma^2}}$={' \
-                                         'sq:1.7f}\n'.format(
+                                         '\sigma^2}}$={sq:1.7f}\n'.format(
                     rf=self.current_r_factor_dict['total'],
                     sq=self.current_sigma_squared_dict['total'],
                 )
@@ -750,8 +749,10 @@ if __name__ == '__main__':
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
+        '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
     ]
     obj.list_of_cut_parts_of_file_name = [
+        'Ira',
         'Ira',
         'Ira',
         'Ira',
@@ -760,13 +761,18 @@ if __name__ == '__main__':
 
     # /home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+Ovac/0.2679 0 1/
     # group key must start at 1 and increase by 1.
+    # obj.group_name_and_mask_linker_dict = {
+    #     1: {'name': '0 deg', 'mask': '100', 'experiment_name_mask': 'ZnO-0deg'},
+    #     2: {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'ZnO-45deg'},
+    #     3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'ZnO-75deg'},
+    # }
+
     obj.group_name_and_mask_linker_dict = {
-        1: {'name': '0 deg', 'mask': '100', 'experiment_name_mask': 'ZnO-0deg'},
-        2: {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'ZnO-45deg'},
-        # 3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'ZnO-75deg'},
+        1: {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'ZnO-45deg'},
+        2: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'ZnO-75deg'},
     }
 
-    obj.number_of_curve_directory_paths_for_fit = 3
+    obj.number_of_curve_directory_paths_for_fit = 5
 
     obj.setup_axes()
     obj.load_curves_to_dict_of_multi_curves_for_processing()
