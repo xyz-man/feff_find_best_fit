@@ -159,30 +159,43 @@ class Curve(BaseClass):
     def plot_curve(self, axes=None):
         self.update_label()
         self.transform_curve()
-        if axes is None:
+        if axes is None and self.axes is None:
             plt.plot(self.new_coordinate.x,
                      self.new_coordinate.y,
                      lw=2,
                      label=self.curve_label_latex)
         else:
-            plt.axes(axes)
-            axes.plot(self.new_coordinate.x,
-                     self.new_coordinate.y,
-                     lw=2,
-                     label=self.curve_label_latex)
+            if axes is not None:
+                plt.axes(axes)
+                axes.plot(self.new_coordinate.x,
+                         self.new_coordinate.y,
+                         lw=2,
+                         label=self.curve_label_latex)
+            else:
+                plt.axes(self.axes)
+                self.axes.plot(self.new_coordinate.x,
+                         self.new_coordinate.y,
+                         lw=2,
+                         label=self.curve_label_latex)
         if self.is_src_plotted:
-            if axes is None:
+            if axes is None and self.axes is None:
                 plt.plot(self.src_coordinate.x,
                          self.src_coordinate.y,
                          lw=2,
                          label='src:'+self.curve_label_latex)
             else:
-                plt.axes(axes)
-                axes.plot(self.src_coordinate.x,
-                         self.src_coordinate.y,
-                         lw=2,
-                         label='src:'+self.curve_label_latex)
-
+                if axes is not None:
+                    plt.axes(axes)
+                    axes.plot(self.src_coordinate.x,
+                             self.src_coordinate.y,
+                             lw=2,
+                             label='src:'+self.curve_label_latex)
+                else:
+                    plt.axes(self.axes)
+                    self.axes.plot(self.src_coordinate.x,
+                             self.src_coordinate.y,
+                             lw=2,
+                             label='src:'+self.curve_label_latex)
         plt.ylabel(self.label.y, fontsize=Configuration.FONTSIZE_Y_LABEL, fontweight='bold')
         plt.xlabel(self.label.x, fontsize=Configuration.FONTSIZE_X_LABEL, fontweight='bold')
         if axes is not None:

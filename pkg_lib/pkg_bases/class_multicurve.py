@@ -13,6 +13,7 @@ from pprint import pprint
 from pkg_lib.pkg_files.dir_and_file_operations import *
 import shutil
 
+
 def get_list_without_duplicates(input_list=None):
     out = None
     if input_list is not None:

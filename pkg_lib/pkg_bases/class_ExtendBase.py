@@ -16,27 +16,36 @@ class ExtendBase(BaseClass):
         self.figure = None
         self.figure_manager = None
 
-    def load_experimental_curve(self):
+    def load_experimental_curve(self, experiment_name_mask=None):
         data = load_experimental_data()
-        self.experimental_curve.src_coordinate.x = data[:, 0]
-        self.experimental_curve.src_coordinate.y = data[:, 1]
-        self.experimental_curve.curve_label_latex = 'ZnO-0deg'
-        self.experimental_curve.label.x = 'Energy,[eV]'
-        self.experimental_curve.label.y = 'Intensity,[a.u.]'
-        # self.experimental_curve.plot_curve()
-        # plt.draw()
+        if experiment_name_mask is None:
+            experiment_name_mask = 'ZnO-0deg'
+        if experiment_name_mask in 'ZnO-0deg':
+            self.experimental_curve.src_coordinate.x = data[:, 0]
+            self.experimental_curve.src_coordinate.y = data[:, 1]
+            self.experimental_curve.curve_label_latex = 'ZnO-0deg'
+            self.experimental_curve.label.x = 'Energy,[eV]'
+            self.experimental_curve.label.y = 'Intensity,[a.u.]'
+            # self.experimental_curve.plot_curve()
+            # plt.draw()
 
-        # self.experimental_curve.src_coordinate.x = data[:, 0]
-        # self.experimental_curve.src_coordinate.y = data[:, 2]
-        # self.experimental_curve.curve_label_latex = 'ZnO-45deg'
-        # self.experimental_curve.plot_curve()
-        # plt.draw()
-        #
-        # self.experimental_curve.src_coordinate.x = data[:, 0]
-        # self.experimental_curve.src_coordinate.y = data[:, 3]
-        # self.experimental_curve.curve_label_latex = 'ZnO-75deg'
-        # self.experimental_curve.plot_curve()
-        # plt.draw()
+        if experiment_name_mask in 'ZnO-45deg':
+            self.experimental_curve.src_coordinate.x = data[:, 0]
+            self.experimental_curve.src_coordinate.y = data[:, 2]
+            self.experimental_curve.curve_label_latex = 'ZnO-45deg'
+            self.experimental_curve.label.x = 'Energy,[eV]'
+            self.experimental_curve.label.y = 'Intensity,[a.u.]'
+            # self.experimental_curve.plot_curve()
+            # plt.draw()
+
+        if experiment_name_mask in 'ZnO-75deg':
+            self.experimental_curve.src_coordinate.x = data[:, 0]
+            self.experimental_curve.src_coordinate.y = data[:, 3]
+            self.experimental_curve.curve_label_latex = 'ZnO-75deg'
+            self.experimental_curve.label.x = 'Energy,[eV]'
+            self.experimental_curve.label.y = 'Intensity,[a.u.]'
+            # self.experimental_curve.plot_curve()
+            # plt.draw()
 
     def setup_axes(self):
         plt.ion()  # Force interactive

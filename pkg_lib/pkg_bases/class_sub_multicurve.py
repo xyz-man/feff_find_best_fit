@@ -31,6 +31,14 @@ class SubMultiCurve(ExtendBase):
         self.current_file_name = None
         self.current_name = None
         self.current_hash = None
+
+        self.current_group_id = None
+        self.current_group_name = None
+        self.current_group_mask = None
+
+        self.current_model_name = None
+        self.current_model_path = None
+
         self.current_curve = Curve()
         self.current_curve.label.x = 'Energy,[eV]'
         self.current_curve.label.y = 'Intensity,[a.u.]'
@@ -42,6 +50,8 @@ class SubMultiCurve(ExtendBase):
         self.number_of_energy_points = 100
 
         self.dict_of_theoretical_curves = odict()
+        # the linker between tha groups name and the sub-folder names (for multigroup fitting, class MultiGroupCurve):
+        self.group_name_and_mask_linker_dict = None
 
         self.out_directory_name = None
 
@@ -55,10 +65,16 @@ class SubMultiCurve(ExtendBase):
         self.current_file_name = None
         self.current_name = None
         self.current_hash = None
+        self.current_group_id = None
+        self.current_group_name = None
+        self.current_group_mask = None
+        self.current_model_name = None
+        self.current_model_path = None
         self.current_curve = Curve()
         self.current_curve.label.x = 'Energy,[eV]'
         self.current_curve.label.y = 'Intensity,[a.u.]'
         self.dict_of_theoretical_curves = odict()
+        self.group_name_and_mask_linker_dict = None
 
     def get_hash(self, val=None):
         out = None
@@ -69,14 +85,25 @@ class SubMultiCurve(ExtendBase):
     def load_curves_to_dict_of_theoretical_curves(self):
         spectra_dict = get_dict_of_spectra_filenames_and_prepared_names_from_dir(
             dir_path=self.working_directory_path,
-            cut_dir_name=self.cut_part_of_file_name
+            cut_dir_name=self.cut_part_of_file_name,
+            group_name_and_mask_dict=self.group_name_and_mask_linker_dict
         )
+        # leave only those filenames which consists specific text
         i = 0
         for key, val in spectra_dict.items():
             self.current_id = i
             self.current_file_name = val['filename']
-            self.current_hash = self.get_hash(val=self.current_file_name)
             self.current_name = val['name']
+            self.current_group_id = val['group_id']
+            self.current_group_name = val['group_name']
+            self.current_group_mask = val['group_mask']
+            self.current_model_name = val['model_name']
+            self.current_model_path = val['model_path']
+            if self.current_group_name is None:
+                self.current_hash = self.get_hash(val=self.current_file_name)
+            else:
+                self.current_hash = self.get_hash(val=self.current_model_path)
+
             self.current_curve.src_coordinate.x, self.current_curve.src_coordinate.y = \
                 load_theoretical_xmu_data(self.current_file_name)
 
@@ -109,6 +136,13 @@ class SubMultiCurve(ExtendBase):
             tmp_dict['hash'] = self.current_hash
             tmp_dict['filename'] = self.current_file_name
             tmp_dict['name'] = self.current_name
+
+            tmp_dict['group_id'] = self.current_group_id
+            tmp_dict['group_name'] = self.current_group_name
+            tmp_dict['group_mask'] = self.current_group_mask
+            tmp_dict['model_name'] = self.current_model_name
+            tmp_dict['model_path'] = self.current_model_path
+
             tmp_dict['curve'] = deepcopy(self.current_curve)
             self.dict_of_theoretical_curves[key] = tmp_dict
 
