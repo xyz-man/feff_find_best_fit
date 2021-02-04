@@ -763,10 +763,10 @@ if __name__ == '__main__':
     obj.group_name_and_mask_linker_dict = {
         1: {'name': '0 deg', 'mask': '100', 'experiment_name_mask': 'ZnO-0deg'},
         2: {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'ZnO-45deg'},
-        3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'ZnO-75deg'},
+        # 3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'ZnO-75deg'},
     }
 
-    obj.number_of_curve_directory_paths_for_fit = 4
+    obj.number_of_curve_directory_paths_for_fit = 3
 
     obj.setup_axes()
     obj.load_curves_to_dict_of_multi_curves_for_processing()

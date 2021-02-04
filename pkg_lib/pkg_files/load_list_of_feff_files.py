@@ -6,6 +6,7 @@
 import os
 from pprint import pprint
 from loguru import logger
+from copy import copy, deepcopy
 
 
 def load_filenames_of_feff_spectra_recursively_in_dir(dir_path=None):
@@ -103,11 +104,17 @@ def get_dict_of_spectra_filenames_and_prepared_names_from_dir(dir_path=None,
                               'model_name': None,
                               'model_path': None,
                               }
+                    i = i + 1
                 else:
-                    out[i] = get_group_name_and_mask_for_filename(filename=file,
+                    tmp_val = get_group_name_and_mask_for_filename(filename=file,
                                                                   cut_dir_name=cut_dir_name,
                                                                   group_name_and_mask_dict=group_name_and_mask_dict)
-                i = i + 1
+                    if tmp_val is not None:
+                        if len(tmp_val) > 1:
+                            # split data for such groups/subfolders that are
+                            # not mentioned in group_name_and_mask_linker_dict
+                            out[i] = copy(tmp_val)
+                            i = i + 1
     return out
 
 
