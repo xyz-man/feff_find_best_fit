@@ -3,6 +3,7 @@
 * e-mail: yuginboy@gmail.com
 * Last modified: 14.09.2020
 '''
+from loguru import logger
 import os
 from pkg_lib.pkg_cfg.class_configure import Configuration
 import numpy as np
@@ -19,6 +20,7 @@ def load_theoretical_xmu_data(file_path):
 
 def load_experimental_data():
     # load experimental xmu-data file. In  non-existent points we use linear interp procedure
+    logger.info(Configuration.PATH_TO_EXPERIMENT_SPECTRA_FILE)
     data = np.loadtxt(Configuration.PATH_TO_EXPERIMENT_SPECTRA_FILE, float)
     data[:, 0] = data[:, 0] + Configuration.EXPERIMENTAL_SPECTRUM_X_SHIFT
     x_old = data[:, 0]
@@ -41,6 +43,6 @@ if __name__ == '__main__':
     file_path2 = r'/mnt/nfsv4/abel_share/free_share/ZnO/ZnO_ideal_p=[101]_0001/xmu.dat'
     file_path3 = r'/mnt/nfsv4/abel_share/free_share/ZnO/ZnO_ideal_p=[103]_0001/xmu.dat'
     exp_data_path2 = os.path.join(
-        Configuration.PATH_TO_LOCAL_DATA_DIRECTORY, 'experiment', 'experiment_ZnO_O-Kedge_[0,45,75].dat')
+        Configuration.PATH_TO_LOCAL_DATA_DIRECTORY, 'experiment', Configuration.EXPERIMENTAL_SPECTRA_FILE_NAME)
     chi1 = load_theoretical_xmu_data(file_path1)
     chi2 = load_theoretical_xmu_data(file_path2)

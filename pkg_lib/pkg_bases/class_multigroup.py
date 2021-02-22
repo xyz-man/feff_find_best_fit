@@ -3,7 +3,9 @@
 * e-mail: yuginboy@gmail.com
 * Last modified: 01.02.2021
 '''
+
 from pkg_lib.pkg_bases.class_multicurve import *
+from pkg_lib.pkg_cfg.class_configure import Configuration
 
 
 class MultiGroupCurve(ExtendBase):
@@ -638,8 +640,9 @@ class MultiGroupCurve(ExtendBase):
             # time.sleep(5)
             self.out_directory_name = create_out_data_folder(
                 main_folder_path=Configuration.PATH_TO_LOCAL_TMP_DIRECTORY,
-                first_part_of_folder_name='multi-curves-fit-[{}]-[N={}]'.format(
+                first_part_of_folder_name='multi-curves-fit-[{}]-[G={}]-[M={}]'.format(
                     str(self.experimental_curve.curve_label_latex).replace(' ', '_'),
+                    len(self.group_name_and_mask_linker_dict),
                     self.number_of_curve_directory_paths_for_fit,
                 ),
             )
@@ -743,6 +746,10 @@ class MultiGroupCurve(ExtendBase):
 
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
+    sample_type = 'ZnO_ref'
+    sample_type = 'YbZnO_5e14'
+    sample_type = 'YbZnO_5e15'
+
     obj = MultiGroupCurve()
     obj.list_of_theoretical_spectra_directory_path = [
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
@@ -759,20 +766,52 @@ if __name__ == '__main__':
         'Ira',
     ]
 
-    # /home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+Ovac/0.2679 0 1/
-    # group key must start at 1 and increase by 1.
-    # obj.group_name_and_mask_linker_dict = {
-    #     1: {'name': '0 deg', 'mask': '100', 'experiment_name_mask': 'ZnO-0deg'},
-    #     2: {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'ZnO-45deg'},
-    #     3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'ZnO-75deg'},
-    # }
+    if sample_type == 'ZnO_ref':
+        Configuration.EXPERIMENTAL_SPECTRA_FILE_NAME = 'experiment_ZnO_O-Kedge_[0,45,75].dat'
+        Configuration.EXPERIMENTAL_SPECTRUM_X_SHIFT = -541.99
+        Configuration.EXPERIMENTAL_SPECTRUM_Y_SHIFT = -1.865
+        Configuration.EXPERIMENTAL_SPECTRUM_Y_SCALE = 0.853
 
-    obj.group_name_and_mask_linker_dict = {
-        1: {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'ZnO-45deg'},
-        2: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'ZnO-75deg'},
-    }
+        Configuration.EXPERIMENTAL_SPECTRA_FILE_NAME = 'experiment_ZnO__ref_O-Kedge_[0,45,75].dat'
+        Configuration.EXPERIMENTAL_SPECTRUM_Y_SHIFT = 0
+        Configuration.EXPERIMENTAL_SPECTRUM_Y_SCALE = 1
+        # /home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+Ovac/0.2679 0 1/
+        # group key must start at 1 and increase by 1.
+        obj.group_name_and_mask_linker_dict = {
+            1: {'name': '0 deg', 'mask': '100', 'experiment_name_mask': 'ZnO-0deg'},
+            2: {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'ZnO-45deg'},
+            3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'ZnO-75deg'},
+        }
 
-    obj.number_of_curve_directory_paths_for_fit = 5
+        # obj.group_name_and_mask_linker_dict = {
+        #     1: {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'ZnO-45deg'},
+        #     2: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'ZnO-75deg'},
+        # }
+
+    if sample_type == 'YbZnO_5e14':
+        obj.group_name_and_mask_linker_dict = {
+            1: {'name': '0 deg', 'mask': '100', 'experiment_name_mask': 'YbZnO_5e14-0deg'},
+            2: {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'YbZnO_5e14-45deg'},
+            3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'YbZnO_5e14-75deg'},
+        }
+        Configuration.EXPERIMENTAL_SPECTRA_FILE_NAME = 'experiment_YbZnO__5e14_O-Kedge_[0,45,75].dat'
+        Configuration.EXPERIMENTAL_SPECTRUM_X_SHIFT = -541.99
+        Configuration.EXPERIMENTAL_SPECTRUM_Y_SHIFT = 0
+        Configuration.EXPERIMENTAL_SPECTRUM_Y_SCALE = 1
+
+    if sample_type == 'YbZnO_5e15':
+        Configuration.EXPERIMENTAL_SPECTRA_FILE_NAME = 'experiment_YbZnO__5e15_O-Kedge_[0,45,75].dat'
+        Configuration.EXPERIMENTAL_SPECTRUM_X_SHIFT = -541.99
+        Configuration.EXPERIMENTAL_SPECTRUM_Y_SHIFT = 0
+        Configuration.EXPERIMENTAL_SPECTRUM_Y_SCALE = 1
+        obj.group_name_and_mask_linker_dict = {
+            1: {'name': '0 deg', 'mask': '100', 'experiment_name_mask': 'YbZnO_5e15-0deg'},
+            2: {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'YbZnO_5e15-45deg'},
+            3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'YbZnO_5e15-75deg'},
+        }
+
+    obj.number_of_curve_directory_paths_for_fit = 3
+    Configuration.init()
 
     obj.setup_axes()
     obj.load_curves_to_dict_of_multi_curves_for_processing()

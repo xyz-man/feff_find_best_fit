@@ -253,8 +253,8 @@ if __name__ == '__main__':
     # obj.transform_coefficient.shift_factor.y = 0.5
 
     plt.legend()
+    plt.show()
     fig.savefig('temp.png')
-    # plt.show()
 
     # obj.src_coordinate.x = np.r_[-20:40.05:0.05]
     # obj.src_coordinate.y = np.sin(obj.src_coordinate.x)
