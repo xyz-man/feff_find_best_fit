@@ -19,6 +19,8 @@ class MultiGroupCurve(ExtendBase):
     '''
     def __init__(self):
         super(MultiGroupCurve, self).__init__()
+        # The name of sample type which will be used in output filename:
+        self.sample_type_name = 'ZnO-ref'
         self.list_of_theoretical_spectra_directory_path = []
         # the word by which the full path to the file will be cut and the curve name will be created
         self.list_of_cut_parts_of_file_name = []
@@ -641,7 +643,7 @@ class MultiGroupCurve(ExtendBase):
             self.out_directory_name = create_out_data_folder(
                 main_folder_path=Configuration.PATH_TO_LOCAL_TMP_DIRECTORY,
                 first_part_of_folder_name='multi-curves-fit-[{}]-[G={}]-[M={}]'.format(
-                    str(self.experimental_curve.curve_label_latex).replace(' ', '_'),
+                    self.sample_type_name,
                     len(self.group_name_and_mask_linker_dict),
                     self.number_of_curve_directory_paths_for_fit,
                 ),
@@ -715,8 +717,9 @@ class MultiGroupCurve(ExtendBase):
             header_txt += '\n\n'
             header_txt += columns_name_txt
 
-            self.current_out_file_name = 'R={} Group name [{}] fit by M={} models and G={} groups'.format(
+            self.current_out_file_name = 'R={} [{}] Group name [{}] fit by M={} models and G={} groups'.format(
                 round(self.current_r_factor_dict['total'], 5),
+                self.sample_type_name,
                 group_val['name'],
                 self.number_of_curve_directory_paths_for_fit,
                 len(self.group_name_and_mask_linker_dict),
@@ -729,8 +732,9 @@ class MultiGroupCurve(ExtendBase):
         # save to the PNG file:
         plt.draw()
         plt.show()
-        self.current_out_file_name = 'R={} fit by M={} models and G={} groups'.format(
+        self.current_out_file_name = 'R={} [{}] fit by M={} models and G={} groups'.format(
             round(self.current_r_factor_dict['total'], 5),
+            self.sample_type_name,
             self.number_of_curve_directory_paths_for_fit,
             len(self.group_name_and_mask_linker_dict),
         ).replace(' ', '_')
@@ -751,6 +755,7 @@ if __name__ == '__main__':
     sample_type = 'YbZnO_5e15'
 
     obj = MultiGroupCurve()
+    obj.sample_type_name = sample_type
     obj.list_of_theoretical_spectra_directory_path = [
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
@@ -810,7 +815,7 @@ if __name__ == '__main__':
             3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'YbZnO_5e15-75deg'},
         }
 
-    obj.number_of_curve_directory_paths_for_fit = 3
+    obj.number_of_curve_directory_paths_for_fit = 4
     Configuration.init()
 
     obj.setup_axes()
