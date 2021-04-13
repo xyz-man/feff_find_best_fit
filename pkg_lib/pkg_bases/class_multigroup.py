@@ -751,8 +751,8 @@ class MultiGroupCurve(ExtendBase):
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
     sample_type = 'ZnO_ref'
-    sample_type = 'YbZnO_5e14'
-    sample_type = 'YbZnO_5e15'
+    # sample_type = 'YbZnO_5e14'
+    # sample_type = 'YbZnO_5e15'
 
     obj = MultiGroupCurve()
     obj.sample_type_name = sample_type
@@ -815,7 +815,7 @@ if __name__ == '__main__':
             3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'YbZnO_5e15-75deg'},
         }
 
-    obj.number_of_curve_directory_paths_for_fit = 4
+    obj.number_of_curve_directory_paths_for_fit = 5
     Configuration.init()
 
     obj.setup_axes()
