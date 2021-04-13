@@ -74,6 +74,36 @@ class MultiGroupCurve(ExtendBase):
 
         self.dict_of_results = odict()
 
+        # restriction on combining models. If we have set of models: A, B, C, D and there is a restriction on A + D,
+        # then in pair combinations  of models we will see only: AD, BC. If we need 3 models for fit then we get:
+        # ADB, ADC
+        '''
+        {
+            1: { # the first constrain
+                'list_of_cut_parts_of_file_name': [
+                    'Ira',
+                    'Ira',
+                ],
+                'model_path_list': [
+                    '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/O_i-central/',
+                    '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/Oi+V-Zn/',
+                ]
+            },
+            2: { # the second constrain
+                'list_of_cut_parts_of_file_name': [
+                    'Ira',
+                    'Ira',
+                ],
+                'model_path_list': [
+                    '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO-pure-amer2/',
+                    '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+Ovac/',
+                ]
+            }
+        }
+        '''
+        self.dict_of_constrains_on_combining_models = {}
+        self.hash_list_of_constraints_on_combining_models = None
+
         self.out_directory_name = None
 
     def flush(self):
@@ -114,6 +144,7 @@ class MultiGroupCurve(ExtendBase):
         self.global_minimum_r_factor = 10
         self.dict_of_results = odict()
         self.out_directory_name = None
+        self.hash_list_of_constraints_on_combining_models = None
 
     def setup_axes(self):
         plt.ion()  # Force interactive
@@ -188,6 +219,45 @@ class MultiGroupCurve(ExtendBase):
                 if group_name in val['name']:
                     out = self.dict_of_experimental_curves_separated_by_groups[key]['experimental_curve']
                     return out
+        return out
+
+    def get_hash_list_for_constraints_on_combining_models(self):
+        '''
+        get dist with description of constrains:
+        {
+            1: { # the first constrain
+                'model_path_list': [
+                    '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/O_i-central/',
+                    '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/Oi+V-Zn/',
+                ]
+            },
+            2: { # the second constrain
+                ...
+            }
+        }
+        :return:
+        '''
+        out = None
+
+        if len(self.dict_of_constrains_on_combining_models) > 0:
+            out = []
+            for rkey, rval in self.dict_of_constrains_on_combining_models.items():
+                list_of_cut_parts_of_file_name = None
+                model_path_list = None
+                list_of_cut_parts_of_file_name = rval['list_of_cut_parts_of_file_name']
+                model_path_list = rval['model_path_list']
+                current_hash_list = []
+                for cut_name, dpath in zip(list_of_cut_parts_of_file_name, model_path_list):
+                    spectra_dict = get_dict_of_spectra_filenames_and_prepared_names_from_dir(
+                        dir_path=dpath,
+                        cut_dir_name=cut_name,
+                        group_name_and_mask_dict=self.group_name_and_mask_linker_dict
+                    )
+                    current_hash_list.append(spectra_dict[0]['model_hash'])
+                out.append(current_hash_list)
+        print('hash list of constraints:')
+        pprint(out)
+        self.hash_list_of_constraints_on_combining_models = out
         return out
 
     def get_current_sub_multi_curve_by_id(self, idx=None):
@@ -470,9 +540,21 @@ class MultiGroupCurve(ExtendBase):
         logger.info(len(result_hash_list_combinations_without_duplicates))
         # logger.info(result_hash_list_combinations_without_duplicates)
         result_hash_list_combinations_without_duplicates.sort()
-        self.list_of_hash_combinations = result_hash_list_combinations_without_duplicates
+
+        print('length of models hash list without duplicates: ', len(result_hash_list_combinations_without_duplicates))
+        if self.hash_list_of_constraints_on_combining_models is None:
+            self.get_hash_list_for_constraints_on_combining_models()
+
+        result_hash_list = filter_list_of_tuples_by_values_from_current_list_of_lists(
+            input_hash_list=result_hash_list_combinations_without_duplicates,
+            constraints_hash_list=self.hash_list_of_constraints_on_combining_models,
+        )
+        print('length of models hash list after constraints filtering: ',
+              len(result_hash_list))
+
+        self.list_of_hash_combinations = result_hash_list
         # pprint(self.list_of_hash_combinations)
-        return result_hash_list_combinations_without_duplicates
+        return result_hash_list
 
     def func_for_optimize(self, x):
         # create function of snapshots linear composition Sum[x_i*F_i]
@@ -691,6 +773,9 @@ class MultiGroupCurve(ExtendBase):
             for val in self.list_of_theoretical_spectra_directory_path:
                 header_txt += '\t' + val + '\n'
 
+            header_txt = header_txt + 'list of constraints:\n'
+            header_txt += pformat(self.dict_of_constrains_on_combining_models) + '\n'*2
+
             columns_name_txt = 'Energy(eV)\tRaw:[{exper}]\tRaw R-region: [{exper}]\tTotal:[{exper}] [{num} models ' \
                                'fit]\tTotal:[{exper}] R-region: [{num} models fit]'.format(
                 exper=group_val['name'],
@@ -703,7 +788,7 @@ class MultiGroupCurve(ExtendBase):
                 current_curve = current_dict_of_curve_group['theoretical_curve']
                 # generate txt string:
                 current_label = current_label + '{0} x [ '.format(
-                    round(self.current_optimized_params[i], 5)
+                    round(self.current_optimized_params[i], 17)
                 ) + current_dict_of_curve_group['name'] + ' ]'
                 if i < len(self.current_optimized_params) - 1:
                     current_label = current_label + ' + \n'
@@ -751,8 +836,8 @@ class MultiGroupCurve(ExtendBase):
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
     sample_type = 'ZnO_ref'
-    # sample_type = 'YbZnO_5e14'
-    # sample_type = 'YbZnO_5e15'
+    sample_type = 'YbZnO_5e14'
+    sample_type = 'YbZnO_5e15'
 
     obj = MultiGroupCurve()
     obj.sample_type_name = sample_type
@@ -815,11 +900,41 @@ if __name__ == '__main__':
             3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'YbZnO_5e15-75deg'},
         }
 
+    # set the models which go together in fitting procedure
+    # setup: model_path_list - paths to models in constraint relationship,
+    # the 'group_id_lst': [1, 2, 3] is a list of group_id values for which constrains could be applied
+    obj.dict_of_constrains_on_combining_models = {
+        1: { # the first constrain
+            'list_of_cut_parts_of_file_name': [
+                'Ira',
+                'Ira',
+            ],
+            'model_path_list': [
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/O_i-central/',
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/Oi+V-Zn/',
+            ]
+        },
+        # 2: { # the second constrain
+        #     'list_of_cut_parts_of_file_name': [
+        #         'Ira',
+        #         'Ira',
+        #     ],
+        #     'model_path_list': [
+        #         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO-pure-amer2/',
+        #         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+Ovac/',
+        #     ]
+        # }
+    }
+
+    pprint(obj.dict_of_constrains_on_combining_models)
+
     obj.number_of_curve_directory_paths_for_fit = 5
     Configuration.init()
 
     obj.setup_axes()
     obj.load_curves_to_dict_of_multi_curves_for_processing()
+
+    obj.get_hash_list_for_constraints_on_combining_models()
 
     obj.run_fit_procedure()
     logger.info('finish multicurve fit')

@@ -14,17 +14,6 @@ from pkg_lib.pkg_files.dir_and_file_operations import *
 import shutil
 
 
-def get_list_without_duplicates(input_list=None):
-    out = None
-    if input_list is not None:
-        out = list(set(input_list))
-    return out
-
-
-def remove_duplicates_from_list_of_tuples(lst):
-    return [t for t in (set(tuple(sorted(i)) for i in lst))]
-
-
 class MultiCurve(ExtendBase):
     '''
     you need to define a way to calculate the hash key value.

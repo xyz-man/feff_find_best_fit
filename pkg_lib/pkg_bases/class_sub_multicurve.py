@@ -6,7 +6,7 @@
 from pkg_lib.pkg_bases.class_ExtendBase import ExtendBase
 from pkg_lib.pkg_bases.class_two_spectrums import *
 from pkg_lib.pkg_files.load_list_of_feff_files import *
-from hashlib import sha256
+# from hashlib import sha256
 
 from typing import NewType
 
@@ -77,9 +77,7 @@ class SubMultiCurve(ExtendBase):
         self.group_name_and_mask_linker_dict = None
 
     def get_hash(self, val=None):
-        out = None
-        if val is not None:
-            out = sha256(val.encode('utf-8')).hexdigest()
+        out = get_hash(val)
         return out
 
     def load_curves_to_dict_of_theoretical_curves(self):
