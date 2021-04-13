@@ -74,7 +74,10 @@ class MultiGroupCurve(ExtendBase):
 
         self.dict_of_results = odict()
 
-        # restriction on combining models. If we have set of models: A, B, C, D and there is a restriction on A + D,
+        # add constraints to the combination of models. Now, if 2 models are in the constraint list,
+        # it means that there are only cases in model combinations where these models meet together or
+        # do not occur separately at all.
+        # If we have set of models: A, B, C, D and there is a restriction on A + D,
         # then in pair combinations  of models we will see only: AD, BC. If we need 3 models for fit then we get:
         # ADB, ADC
         '''
@@ -223,19 +226,22 @@ class MultiGroupCurve(ExtendBase):
 
     def get_hash_list_for_constraints_on_combining_models(self):
         '''
-        get dist with description of constrains:
+        get dict with description of constraints:
         {
-            1: { # the first constrain
+            1: { # the first constraint
                 'model_path_list': [
                     '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/O_i-central/',
                     '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/Oi+V-Zn/',
                 ]
             },
-            2: { # the second constrain
+            2: { # the second constraint
                 ...
             }
         }
-        :return:
+        :return: hash list of constraints: [
+                    ['9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
+                    '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae']
+                    ]
         '''
         out = None
 
@@ -900,9 +906,11 @@ if __name__ == '__main__':
             3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'YbZnO_5e15-75deg'},
         }
 
-    # set the models which go together in fitting procedure
+    # add constraints to the combination of models.
+    # Now, if 2 models are in the constraint list, it means that there are only cases in model combinations
+    # where these models meet together or do not occur separately at all.
+    #
     # setup: model_path_list - paths to models in constraint relationship,
-    # the 'group_id_lst': [1, 2, 3] is a list of group_id values for which constrains could be applied
     obj.dict_of_constrains_on_combining_models = {
         1: { # the first constrain
             'list_of_cut_parts_of_file_name': [
