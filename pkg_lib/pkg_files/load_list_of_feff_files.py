@@ -6,25 +6,45 @@
 import os
 from pprint import pprint, pformat
 from loguru import logger
+from pkg_lib.pkg_cfg.class_configure import Configuration
 from copy import copy, deepcopy
 from hashlib import sha256
+import numpy as np
+
+
+def walk_level(top_dir, level: int = 0):
+    top_dir = top_dir.rstrip(os.path.sep)
+    assert os.path.isdir(top_dir)
+    num_sep = top_dir.count(os.path.sep)
+    for root, dirs, files in os.walk(top_dir):
+        yield root, dirs, files
+        num_sep_this = root.count(os.path.sep)
+        if num_sep + level <= num_sep_this:
+            del dirs[:]
 
 
 def get_hash(val=None):
     out = None
     if val is not None:
         out = sha256(val.encode('utf-8')).hexdigest()
-    return out
+    return out[-Configuration.HASH_LENGTH:]
 
 
-def load_filenames_of_feff_spectra_recursively_in_dir(dir_path=None):
+def load_filenames_of_feff_spectra_recursively_in_dir(dir_path=None, level: int = 0):
     out = None
     if os.path.isdir(dir_path):
         out = list()
-        for root, dirs, files in os.walk(os.path.normpath(dir_path)):
-            for file in files:
-                if (file.endswith("xmu.dat")):
-                    out.append(os.path.join(root, file))
+        if level == 0:
+            for root, dirs, files in os.walk(os.path.normpath(dir_path)):
+                for file in files:
+                    if (file.endswith("xmu.dat")):
+                        out.append(os.path.join(root, file))
+                    # print(os.path.join(root, file))
+        else:
+            for root, dirs, files in walk_level(os.path.normpath(dir_path), level=level):
+                for file in files:
+                    if (file.endswith("xmu.dat")):
+                        out.append(os.path.join(root, file))
                     # print(os.path.join(root, file))
     return out
 
@@ -86,6 +106,9 @@ def get_group_name_and_mask_for_filename(filename=None, cut_dir_name=None, group
                     'model_path': mpath,
                     'model_hash': get_hash(val=mpath),
                 }
+                print('=='*20)
+                print('mpath:', mpath)
+                print('hash: ', get_hash(val=mpath))
         if len(out) < 1:
             logger.info(f'Can not detect any Groups for current model: {filename}.')
             logger.info('Please check the path name.')
@@ -94,9 +117,12 @@ def get_group_name_and_mask_for_filename(filename=None, cut_dir_name=None, group
 
 def get_dict_of_spectra_filenames_and_prepared_names_from_dir(dir_path=None,
                                                               cut_dir_name=None,
-                                                              group_name_and_mask_dict=None):
+                                                              group_name_and_mask_dict=None,
+                                                              path_level=0,
+                                                              ):
     '''
 
+    :param path_level: level to walk and looking for xmu.dat file throw directories
     :param dir_path:
     :param cut_dir_name:
     :param group_name_and_mask_dict:
@@ -125,7 +151,7 @@ def get_dict_of_spectra_filenames_and_prepared_names_from_dir(dir_path=None,
     out = None
     if os.path.isdir(dir_path) and cut_dir_name is not None:
         out = dict()
-        fn_lst = load_filenames_of_feff_spectra_recursively_in_dir(dir_path)
+        fn_lst = load_filenames_of_feff_spectra_recursively_in_dir(dir_path, level=path_level)
         i = 0
         for file in fn_lst:
             if os.path.isfile(file):
@@ -152,6 +178,52 @@ def get_dict_of_spectra_filenames_and_prepared_names_from_dir(dir_path=None,
                             out[i] = copy(tmp_val)
                             i = i + 1
     return out
+
+
+def is_key_list_completely_contained_in_tuple(key_list=None, input_tuple=None):
+    '''
+    Check if all keys: [1, 2] contain in input_tuple=(1, 2, 4, 6, 8) or (0, 2, 4, 5, 9),
+    :param key_list: [1, 2]
+    :param input_tuple: (0, 2, 4, 5, 9)
+    :return: True for (1, 2, 4, 6, 8) and False (0, 2, 4, 5, 9)
+    '''
+    if key_list is not None and input_tuple is not None:
+        tmp = []
+        for key in key_list:
+            if key not in input_tuple:
+                return False
+        return True
+    return False
+
+
+def is_any_of_keys_from_list_contains_in_tuple(key_list=None, input_tuple=None):
+    '''
+    Check if any of keys: [1, 2] are contained in the input_tuple=(1, 2, 4, 6,
+    8) or (0, 2, 4, 5, 9),
+    :param key_list: [1, 2]
+    :param input_tuple: (0, 2, 4, 5, 9)
+    :return:  for [1, 2] return True in (0, 2, 4, 5, 9) or False in  (0, 3, 4, 5, 9)
+    '''
+    if key_list is not None and input_tuple is not None:
+        for key in key_list:
+            if key in input_tuple:
+                return True
+    return False
+
+
+def is_keys_are_only_partially_contained_in_the_tuple(key_list=None, input_tuple=None):
+    '''
+    Check if any of keys: [1, 2] are only partially contained in the input_tuple=(1, 2, 4, 6,
+    8) or (0, 2, 4, 5, 9),
+    :param key_list: [1, 2]
+    :param input_tuple: (0, 2, 4, 5, 9)
+    :return: for keys: [1, 2] return True for (0, 2, 4, 5, 9) and False for (1, 2, 4, 6, 7)
+    '''
+    if key_list is not None and input_tuple is not None:
+        if (not is_key_list_completely_contained_in_tuple(key_list=key_list, input_tuple=input_tuple)) and \
+               is_any_of_keys_from_list_contains_in_tuple(key_list=key_list, input_tuple=input_tuple):
+            return True
+    return False
 
 
 def filter_list_of_tuples_which_contained_data_from_list(input_list=None, list_with_filter_keys=None):
@@ -226,6 +298,67 @@ def filter_list_of_tuples_which_contained_values_from_current_list_of_lists(inpu
     return out
 
 
+def is_keys_from_the_key_list_always_have_a_pair_in_the_input_tuple(input_tuple=None, key_lists=None):
+    '''
+    Ex:
+
+    :param input_list_of_tuples:
+    :param key_lists:
+    :return:
+    '''
+    out = []
+    if (input_tuple is not None) and (key_lists is not None):
+        uniq_keys = np.unique(key_lists)
+        for u_key in uniq_keys:
+            for key_val in key_lists:
+                if u_key in key_val:
+                    if u_key in input_tuple:
+                        if is_key_list_completely_contained_in_tuple(input_tuple=input_tuple, key_list=key_val):
+                            break
+                        if is_keys_are_only_partially_contained_in_the_tuple(input_tuple=input_tuple, key_list=key_val):
+                            return False
+        return True
+    return False
+
+
+def filter_list_of_tuples_by_list_of_key_lists(input_list_of_tuples=None, key_lists=None):
+    '''
+    Ex:
+    input_list_of_tuples = [
+        (1, 8, 6, 2, 4),
+        (1, 8, 5, 2, 4),
+        (0, 1, 2, 5, 7),
+        (1, 1, 2, 3, 4),
+        (1, 1, 2, 3, 4),
+        (1, 5, 2, 3, 4),
+        (4, 2, 5, 9, 0),
+        (0, 6, 3, 4, 7),
+        (1, 2, 9, 8, 7)
+    ]
+    key_lists = [
+        [1, 2],
+        [1, 3],
+        [4, 5],
+    ]
+    output:
+    [(1, 2, 7, 8, 9), (1, 2, 4, 5, 8), (1, 2, 3, 4, 5)]
+
+    :param input_list_of_tuples:
+    :param key_lists:
+    :return:
+    '''
+    out = []
+    if input_list_of_tuples is not None and key_lists is not None:
+        uniq_keys = np.unique(key_lists)
+        for tuple_val in input_list_of_tuples:
+            if is_keys_from_the_key_list_always_have_a_pair_in_the_input_tuple(
+                    input_tuple=tuple_val, key_lists=key_lists
+            ):
+                # append only when tmp_tuple_list has some value:
+                out.append(tuple_val)
+    return out
+
+
 # ---- does not contain:
 def filter_list_of_tuples_which_does_not_contain_data_from_list(input_list=None, list_with_filter_keys=None):
     '''
@@ -250,7 +383,7 @@ def filter_list_of_tuples_which_does_not_contain_data_from_list(input_list=None,
         :param list_with_filter_keys:
         :return:
         '''
-    if (list_with_filter_keys is not None) and (list_with_filter_keys is not None):
+    if (input_list is not None) and (list_with_filter_keys is not None):
         if len(list_with_filter_keys) > 0:
             out = []
             current_key = list_with_filter_keys.pop()
@@ -370,333 +503,296 @@ if __name__ == '__main__':
         dir_path='/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
         cut_dir_name='Ira'
     )
-    hash_list_of_constraints = [
-        ['9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae'],
-        ['4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d']
-    ]
-
-    hash_list_of_models_combinations = [
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('4fa178d010afc9acbab74097bd4c9920e6f2bf1da00d84f419b0bf883a3a1148',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('502a7c53c62aa02bc0191d293938acecc68ec2a5d5ed9170f0312cf2d8d1e13e',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('739562b9f4177d417830aeabed58e8258cb714a07bb38f093f2217ff338c5828',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae'),
-        ('84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('84f00dbedc771113f4941701c290e92559f524b0aa4ae3b7b584c3859291221d',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5'),
-        ('9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('9381d3161cd48d53f5d19aa6726388b90fd28a0d754424371037fb13772d163f',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f'),
-        ('9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         '9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee'),
-        ('9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
-         'dff5c81c2bd4959087ba797b68455c6cc353b9d401bcfa0ce0912ebf1a50133f',
-         'ef6aa04c20c5443ae05fb35d2b10edb4ea46ef9e61467cb67d2cb5561d75a7ee')]
 
     a = [
-        (1, 2, 4),
-        (1, 3, 4),
-        (1, 9, 4),
-        (3, 2, 5),
-        (1, 7, 6),
-        (7, 2, 1),
-        (1, 2, 4),
-        (7, 1, 2),
-        (8, 7, 2),
-        (0, 1, 7),
-        (2, 1, 7),
-        (9, 4, 5),
-        (1, 5, 8),
-        (7, 5, 8),
+        (1, 8, 6, 2, 4),
+        (1, 8, 5, 2, 4),
+        (0, 1, 2, 5, 7),
+        (1, 1, 2, 3, 4),
+        (1, 1, 2, 3, 4),
+        (1, 5, 2, 3, 4),
+        (4, 2, 5, 9, 0),
+        (0, 6, 3, 4, 7),
+        (1, 2, 9, 8, 7)
     ]
+    bb = [
+        [1, 2],
+        [1, 3],
+        [4, 5],
+    ]
+    print(is_key_list_completely_contained_in_tuple(key_list=[1, 2], input_tuple=(0, 1, 2, 5, 7)))
+    print(is_key_list_completely_contained_in_tuple(key_list=[1, 2], input_tuple=(0, 1, 9, 5, 7)))
     a = remove_duplicates_from_list_of_tuples(a)
     print('Input data:')
     pprint(a)
 
     print('keys:')
-    b = [1, 7]
+    b = [1, 2]
     pprint(b)
     print('contained keys:')
     pprint(filter_list_of_tuples_which_contained_data_from_list(input_list=a, list_with_filter_keys=b))
     print('does not contain keys:')
-    b = [1, 7]
+    b = [1, 2]
     pprint(filter_list_of_tuples_which_does_not_contain_data_from_list(input_list=a, list_with_filter_keys=b))
 
-
-    bb = [
-        [1, 7],
-        [1, 0],
-    ]
     print('keys:')
     pprint(bb)
-    print('contained keys in all lists:')
+    print('list contains keys:')
     pprint(filter_list_of_tuples_which_contained_values_from_current_list_of_lists(
         input_hash_list=a,
-        constraints_hash_list=bb))
-
-    # pprint(filter_list_of_tuples_which_contained_values_from_current_list_of_lists(
-    #     input_hash_list=hash_list_of_models_combinations,
-    #     constraints_hash_list=hash_list_of_constraints))
+        constraints_hash_list=deepcopy(bb)))
 
     print('does not contain keys:')
-    bb = [
-        [1, 7],
-        [1, 0],
-    ]
     pprint(filter_list_of_tuples_which_does_not_contain_values_from_current_list_of_lists(
         input_hash_list=a,
-        constraints_hash_list=bb))
+        constraints_hash_list=deepcopy(bb)))
 
     print('filtered by keys:')
-    bb = [
-        [1, 7],
-        [1, 0],
-    ]
+
     pprint(filter_list_of_tuples_by_values_from_current_list_of_lists(
         input_hash_list=a,
-        constraints_hash_list=bb))
+        constraints_hash_list=deepcopy(bb)))
 
     lst = filter_list_of_tuples_by_values_from_current_list_of_lists(
-        input_hash_list=hash_list_of_models_combinations,
-        constraints_hash_list=hash_list_of_constraints)
+        input_hash_list=a,
+        constraints_hash_list=deepcopy(bb))
     pprint(lst)
+
+    print('filter_list_of_tuples_by_list_of_key_lists:')
+    pprint(filter_list_of_tuples_by_list_of_key_lists(input_list_of_tuples=a, key_lists=bb))
+
+    hash_list_of_constraints = \
+        [['d36b186c26b6d0d5', '27e213cac4717cae'],
+         ['e0912ebf1a50133f', 'd36b186c26b6d0d5'],
+         ['7d2cb5561d75a7ee', '1037fb13772d163f']]
+
+    hash_list_of_models_combinations = \
+        [('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'e0912ebf1a50133f'),
+         ('27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '27e213cac4717cae', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee'),
+         ('1037fb13772d163f', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d'),
+         ('19b0bf883a3a1148', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e')]
+
+    hhash = \
+        [('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '27e213cac4717cae', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '3f2217ff338c5828', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', '7d2cb5561d75a7ee', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', 'b584c3859291221d', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '19b0bf883a3a1148', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '3f2217ff338c5828', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', '7d2cb5561d75a7ee', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', 'b584c3859291221d', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '27e213cac4717cae', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '3f2217ff338c5828', 'b584c3859291221d', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('1037fb13772d163f', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('1037fb13772d163f', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '3f2217ff338c5828', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', '7d2cb5561d75a7ee', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', 'b584c3859291221d', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '27e213cac4717cae', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', 'b584c3859291221d', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('19b0bf883a3a1148', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('19b0bf883a3a1148', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5'),
+         ('27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f'),
+         ('27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '3f2217ff338c5828', '7d2cb5561d75a7ee', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '3f2217ff338c5828', 'b584c3859291221d', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '3f2217ff338c5828', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('27e213cac4717cae', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f'),
+         ('3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'f0312cf2d8d1e13e'),
+         ('3f2217ff338c5828', '7d2cb5561d75a7ee', 'b584c3859291221d', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('3f2217ff338c5828', '7d2cb5561d75a7ee', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('3f2217ff338c5828', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e'),
+         ('7d2cb5561d75a7ee', 'b584c3859291221d', 'd36b186c26b6d0d5', 'e0912ebf1a50133f', 'f0312cf2d8d1e13e')]
+
+    print('len of hash_list_of_models_combinations: ', len(hash_list_of_models_combinations))
+    print('len of hhash: ', len(hhash))
+    print('hhash:')
+    pprint(filter_list_of_tuples_by_values_from_current_list_of_lists(
+        input_hash_list=hhash,
+        constraints_hash_list=hash_list_of_constraints), width=200)
+    print('hash_list_of_constraints is: ', hash_list_of_constraints)
+    print('hash_list_of_models_combinations:')
+    pprint(filter_list_of_tuples_by_values_from_current_list_of_lists(
+        input_hash_list=hash_list_of_models_combinations,
+        constraints_hash_list=hash_list_of_constraints), width=200)
+
+    out = filter_list_of_tuples_by_list_of_key_lists(input_list_of_tuples=hash_list_of_models_combinations,
+                                                     key_lists=hash_list_of_constraints)
+    print('filter_list_of_tuples_by_list_of_key_lists: ', len(out))
+    pprint(out, width=200)
+
     print('')
 

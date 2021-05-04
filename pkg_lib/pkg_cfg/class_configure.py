@@ -48,6 +48,8 @@ class Configuration:
     FONTSIZE_Y_LABEL = 14
     FONTSIZE_X_LABEL = 14
 
+    HASH_LENGTH = 16
+
     @classmethod
     def validate_input_data(cls):
         try:

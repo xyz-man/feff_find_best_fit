@@ -242,6 +242,7 @@ class MultiGroupCurve(ExtendBase):
                     ['9ec8e50d222d8b558cd8666e5876a2258b970959b2210cd9d36b186c26b6d0d5',
                     '9b6bee219ed2ba2ecbc3e15ae6e3a17207f9d996523e8afa27e213cac4717cae']
                     ]
+
         '''
         out = None
 
@@ -254,15 +255,19 @@ class MultiGroupCurve(ExtendBase):
                 model_path_list = rval['model_path_list']
                 current_hash_list = []
                 for cut_name, dpath in zip(list_of_cut_parts_of_file_name, model_path_list):
+                    print('**'*20)
+                    print('Dpath:', dpath)
+                    spectra_dict = None
                     spectra_dict = get_dict_of_spectra_filenames_and_prepared_names_from_dir(
                         dir_path=dpath,
                         cut_dir_name=cut_name,
-                        group_name_and_mask_dict=self.group_name_and_mask_linker_dict
+                        group_name_and_mask_dict=self.group_name_and_mask_linker_dict,
+                        path_level=1,
                     )
                     current_hash_list.append(spectra_dict[0]['model_hash'])
                 out.append(current_hash_list)
         print('hash list of constraints:')
-        pprint(out)
+        pprint(out, width=200)
         self.hash_list_of_constraints_on_combining_models = out
         return out
 
@@ -546,14 +551,18 @@ class MultiGroupCurve(ExtendBase):
         logger.info(len(result_hash_list_combinations_without_duplicates))
         # logger.info(result_hash_list_combinations_without_duplicates)
         result_hash_list_combinations_without_duplicates.sort()
+        pprint('***--'*10)
+        pprint(result_hash_list_combinations_without_duplicates, width=200)
 
         print('length of models hash list without duplicates: ', len(result_hash_list_combinations_without_duplicates))
         if self.hash_list_of_constraints_on_combining_models is None:
             self.get_hash_list_for_constraints_on_combining_models()
 
-        result_hash_list = filter_list_of_tuples_by_values_from_current_list_of_lists(
-            input_hash_list=result_hash_list_combinations_without_duplicates,
-            constraints_hash_list=self.hash_list_of_constraints_on_combining_models,
+        tmp_hash_list_of_constraints = deepcopy(self.hash_list_of_constraints_on_combining_models)
+        print('tmp_hash_list_of_constraints: ', tmp_hash_list_of_constraints)
+        result_hash_list = filter_list_of_tuples_by_list_of_key_lists(
+            input_list_of_tuples=result_hash_list_combinations_without_duplicates,
+            key_lists=tmp_hash_list_of_constraints,
         )
         print('length of models hash list after constraints filtering: ',
               len(result_hash_list))
@@ -628,6 +637,9 @@ class MultiGroupCurve(ExtendBase):
         self.get_dict_of_hash_and_dict_of_group_curves_combinations_for_processing()
         # # prepare data from experimental curve:
         # self.get_points_for_experimental_curve_in_region()
+        pprint_width = Configuration.HASH_LENGTH*self.number_of_curve_directory_paths_for_fit + 40
+        pprint(self.list_of_hash_combinations,
+               width=pprint_width)
         for num, val_lst in enumerate(self.list_of_hash_combinations):
             self.current_hash_list = val_lst
             self.run_fit_procedure_for_current_values()
@@ -788,13 +800,26 @@ class MultiGroupCurve(ExtendBase):
                 num=self.number_of_curve_directory_paths_for_fit,
             )
 
+            header_txt += '\ncoefficients in exponential form :\n'
+            current_label = ''
+            for i, hs in enumerate(self.current_hash_list):
+                current_dict_of_curve_group = self.get_dict_of_groups_of_curves_by_hash(hs)[group_key]
+                current_curve = current_dict_of_curve_group['theoretical_curve']
+                # generate txt string:
+                current_label = current_label + '{0:1.6e} x [ '.format(
+                    self.current_optimized_params[i]
+                ) + current_dict_of_curve_group['name'] + ' ]'
+                if i < len(self.current_optimized_params) - 1:
+                    current_label = current_label + ' + \n'
+            header_txt += current_label
+            header_txt += '\n\nrounded coefficients:\n'
             current_label = ''
             for i, hs in enumerate(self.current_hash_list):
                 current_dict_of_curve_group = self.get_dict_of_groups_of_curves_by_hash(hs)[group_key]
                 current_curve = current_dict_of_curve_group['theoretical_curve']
                 # generate txt string:
                 current_label = current_label + '{0} x [ '.format(
-                    round(self.current_optimized_params[i], 17)
+                    round(self.current_optimized_params[i], 6)
                 ) + current_dict_of_curve_group['name'] + ' ]'
                 if i < len(self.current_optimized_params) - 1:
                     current_label = current_label + ' + \n'
@@ -804,6 +829,7 @@ class MultiGroupCurve(ExtendBase):
                 )
                 # theory model y coordinate:
                 out_array[:, 5 + i] = current_curve.src_coordinate.y
+
             header_txt += current_label
             header_txt += '\n\n'
             header_txt += columns_name_txt
@@ -842,8 +868,8 @@ class MultiGroupCurve(ExtendBase):
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
     sample_type = 'ZnO_ref'
-    sample_type = 'YbZnO_5e14'
-    sample_type = 'YbZnO_5e15'
+    # sample_type = 'YbZnO_5e14'
+    # sample_type = 'YbZnO_5e15'
 
     obj = MultiGroupCurve()
     obj.sample_type_name = sample_type
@@ -853,8 +879,10 @@ if __name__ == '__main__':
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
+        '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
     ]
     obj.list_of_cut_parts_of_file_name = [
+        'Ira',
         'Ira',
         'Ira',
         'Ira',
@@ -922,16 +950,27 @@ if __name__ == '__main__':
                 '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/Oi+V-Zn/',
             ]
         },
-        # 2: { # the second constrain
-        #     'list_of_cut_parts_of_file_name': [
-        #         'Ira',
-        #         'Ira',
-        #     ],
-        #     'model_path_list': [
-        #         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO-pure-amer2/',
-        #         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+Ovac/',
-        #     ]
-        # }
+        2: { # the second constrain
+            'list_of_cut_parts_of_file_name': [
+                'Ira',
+                'Ira',
+            ],
+            'model_path_list': [
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/',
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/O_i-central/',
+            ]
+        },
+        3: { # the third constrain
+            'list_of_cut_parts_of_file_name': [
+                'Ira',
+                'Ira',
+            ],
+            'model_path_list': [
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis2/',
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis2/O_i-dis2-central/',
+            ]
+        },
+
     }
 
     pprint(obj.dict_of_constrains_on_combining_models)
