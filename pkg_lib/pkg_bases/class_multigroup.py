@@ -105,13 +105,19 @@ class MultiGroupCurve(ExtendBase):
         }
         '''
         self.dict_of_constrains_on_combining_models = {}
+
+        #
+        # {}
+        self.models_black_list = None
         self.hash_list_of_constraints_on_combining_models = None
+        self.list_of_all_unique_hashes_from_all_directories = None
 
         self.out_directory_name = None
 
     def flush(self):
         self.list_of_theoretical_spectra_directory_path = []
         self.list_of_cut_parts_of_file_name = []
+        self.models_black_list = None
         self.group_name_and_mask_linker_dict = None
         self.number_of_curve_directory_paths_for_fit = None
         self.current_multi_curve = SubMultiCurve()
@@ -148,6 +154,7 @@ class MultiGroupCurve(ExtendBase):
         self.dict_of_results = odict()
         self.out_directory_name = None
         self.hash_list_of_constraints_on_combining_models = None
+        self.list_of_all_unique_hashes_from_all_directories = None
 
     def setup_axes(self):
         plt.ion()  # Force interactive
@@ -288,6 +295,7 @@ class MultiGroupCurve(ExtendBase):
 
             # set group_name_and_mask_linker_dict value:
             out.group_name_and_mask_linker_dict = self.group_name_and_mask_linker_dict
+            out.path_black_list = self.models_black_list
             # load curves from selected directory:
             out.load_curves_to_dict_of_theoretical_curves()
         return out
@@ -568,6 +576,23 @@ class MultiGroupCurve(ExtendBase):
               len(result_hash_list))
 
         self.list_of_hash_combinations = result_hash_list
+
+        '''
+        https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
+        Given a list of lists t,
+
+        flat_list = [item for sublist in t for item in sublist]
+        which means:
+        
+        flat_list = []
+        for sublist in t:
+            for item in sublist:
+                flat_list.append(item)
+        '''
+        self.list_of_all_unique_hashes_from_all_directories = \
+            list(set([item for sublist in self.list_of_hash_combinations for item in sublist]))
+
+        logger.info('List of unique model hashes: {}'.format(self.list_of_all_unique_hashes_from_all_directories))
         # pprint(self.list_of_hash_combinations)
         return result_hash_list
 
@@ -742,10 +767,11 @@ class MultiGroupCurve(ExtendBase):
             # time.sleep(5)
             self.out_directory_name = create_out_data_folder(
                 main_folder_path=Configuration.PATH_TO_LOCAL_TMP_DIRECTORY,
-                first_part_of_folder_name='multi-curves-fit-[{}]-[G={}]-[M={}]'.format(
+                first_part_of_folder_name='multi-curves-fit-[{}]-[G={}]-[M={}]-[N={}]'.format(
                     self.sample_type_name,
                     len(self.group_name_and_mask_linker_dict),
                     self.number_of_curve_directory_paths_for_fit,
+                    len(self.list_of_hash_combinations),
                 ),
             )
         self.current_out_directory_name = create_out_data_folder(
@@ -793,6 +819,27 @@ class MultiGroupCurve(ExtendBase):
 
             header_txt = header_txt + 'list of constraints:\n'
             header_txt += pformat(self.dict_of_constrains_on_combining_models) + '\n'*2
+
+            if self.models_black_list is not None:
+                if len(self.models_black_list) > 0:
+                    header_txt = header_txt + 'list of models in black list:\n'
+                    header_txt += pformat(self.models_black_list) + '\n'*2
+
+            header_txt = header_txt + 'list of theoretical spectra models involved in fitting procedure:\n'
+            for val in self.list_of_all_unique_hashes_from_all_directories:
+                header_txt += '\t' \
+                              + '[{}]'.format(val) \
+                              + ' <=> '\
+                              + self.get_dict_of_groups_of_curves_by_hash(val)[1]['model_name'] \
+                              + ' <=> '\
+                              + self.get_dict_of_groups_of_curves_by_hash(val)[1]['model_path'] \
+                              + '\n'
+
+            header_txt = header_txt + 'Models hash list after constraints filtering [N={}]: :\n'.format(
+                len(self.list_of_hash_combinations)
+            )
+            for num, val in enumerate(self.list_of_hash_combinations):
+                header_txt += '\t' + '{} : {}'.format(num+1, val) + '\n'
 
             columns_name_txt = 'Energy(eV)\tRaw:[{exper}]\tRaw R-region: [{exper}]\tTotal:[{exper}] [{num} models ' \
                                'fit]\tTotal:[{exper}] R-region: [{num} models fit]'.format(
@@ -868,8 +915,8 @@ class MultiGroupCurve(ExtendBase):
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
     sample_type = 'ZnO_ref'
-    # sample_type = 'YbZnO_5e14'
-    # sample_type = 'YbZnO_5e15'
+    sample_type = 'YbZnO_5e14'
+    sample_type = 'YbZnO_5e15'
 
     obj = MultiGroupCurve()
     obj.sample_type_name = sample_type
@@ -972,6 +1019,10 @@ if __name__ == '__main__':
         },
 
     }
+
+    obj.models_black_list = (
+        '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/',
+    )
 
     pprint(obj.dict_of_constrains_on_combining_models)
 

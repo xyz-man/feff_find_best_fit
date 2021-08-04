@@ -24,6 +24,7 @@ class MultiCurve(ExtendBase):
         self.list_of_theoretical_spectra_directory_path = []
         # the word by which the full path to the file will be cut and the curve name will be created
         self.list_of_cut_parts_of_file_name = []
+        self.models_black_list = None
 
         self.number_of_curve_directory_paths_for_fit = None
 
@@ -64,6 +65,7 @@ class MultiCurve(ExtendBase):
     def flush(self):
         self.list_of_theoretical_spectra_directory_path = []
         self.list_of_cut_parts_of_file_name = []
+        self.models_black_list = None
         self.number_of_curve_directory_paths_for_fit = None
         self.current_multi_curve = SubMultiCurve()
         self.max_of_minimum_energy_point = -1e6
@@ -131,6 +133,7 @@ class MultiCurve(ExtendBase):
             # set the cut part name and directory path:
             out.cut_part_of_file_name = self.list_of_cut_parts_of_file_name[idx]
             out.working_directory_path = self.list_of_theoretical_spectra_directory_path[idx]
+            out.path_black_list = self.models_black_list
             # load curves from selected directory:
             out.load_curves_to_dict_of_theoretical_curves()
         return out

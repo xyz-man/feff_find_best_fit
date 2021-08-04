@@ -19,6 +19,8 @@ class SubMultiCurve(ExtendBase):
         super(SubMultiCurve, self).__init__()
         self.working_directory_path = Configuration.PATH_TO_THEORY_SPECTRA_DIRECTORY
 
+        self.path_black_list = None
+
         # the word by which the full path to the file will be cut and the curve name will be created
         self.cut_part_of_file_name = 'Ira'
 
@@ -53,6 +55,7 @@ class SubMultiCurve(ExtendBase):
         # the linker between tha groups name and the sub-folder names (for multigroup fitting, class MultiGroupCurve):
         self.group_name_and_mask_linker_dict = None
 
+
         self.out_directory_name = None
 
     def flush(self):
@@ -75,6 +78,7 @@ class SubMultiCurve(ExtendBase):
         self.current_curve.label.y = 'Intensity,[a.u.]'
         self.dict_of_theoretical_curves = odict()
         self.group_name_and_mask_linker_dict = None
+        self.path_black_list = None
 
     def get_hash(self, val=None):
         out = get_hash(val)
@@ -84,7 +88,8 @@ class SubMultiCurve(ExtendBase):
         spectra_dict = get_dict_of_spectra_filenames_and_prepared_names_from_dir(
             dir_path=self.working_directory_path,
             cut_dir_name=self.cut_part_of_file_name,
-            group_name_and_mask_dict=self.group_name_and_mask_linker_dict
+            group_name_and_mask_dict=self.group_name_and_mask_linker_dict,
+            path_black_list=self.path_black_list,
         )
         # leave only those filenames which consists specific text
         i = 0
