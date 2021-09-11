@@ -197,7 +197,7 @@ def get_dict_of_spectra_filenames_and_prepared_names_from_dir(dir_path=None,
                                 out[i] = copy(tmp_val)
                                 i = i + 1
                 else:
-                    logger.info('The current file path have been found in black list: {}', os.path.dirname(file))
+                    logger.info('The current file path has been found in black list: {}', os.path.dirname(file))
     return out
 
 

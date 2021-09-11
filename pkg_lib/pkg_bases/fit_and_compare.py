@@ -10,9 +10,6 @@ from pathlib import PurePosixPath
 # from pkg_lib.pkg_files.dir_and_file_operations import
 
 
-
-
-
 class TwoSpectraLinearFit(BaseClass):
     def __init__(self):
         self.working_directory_path = Configuration.PATH_TO_THEORY_SPECTRA_DIRECTORY
