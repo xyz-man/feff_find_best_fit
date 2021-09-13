@@ -39,6 +39,10 @@ class MultiGroupCurve(ExtendBase):
         self.min_of_maximum_energy_point = 1e6
         self.number_of_energy_points = 100
 
+        self.epsilon_threshold = 1e-4
+        self.epsilon_hard_coded_ratio_threshold = 1e-2
+        self.max_restriction_value = 1
+
         # the dict of the self.number_of_curves_for_fit of curves for optimizing:
         self.dict_of_multi_curves_for_processing = None
         self.dict_of_hash_and_dict_of_group_curves_combinations_for_processing = None
@@ -47,6 +51,7 @@ class MultiGroupCurve(ExtendBase):
 
         self.list_of_hash_combinations = None
         self.minimization_method = 'differential_evolution'
+        self.minimization_method_tolerance = 1e-6
         # self.minimization_method = 'minimize'
         # variables for processing for each step of calculations:
         self.current_hash_list = None
@@ -286,12 +291,18 @@ class MultiGroupCurve(ExtendBase):
                 if any((
                         rval['threshold_in_concentrations_ratio'] is not None,
                         rval['hard_coded_concentrations_ratio'] is not None,
+                        rval['concentration_of_first_model_is_greater_then_second_model'] is not None,
+                        rval['concentration_of_second_model_is_greater_then_first_model'] is not None,
                          )):
                     tmp_dict = None
                     tmp_dict = {
                         'model_hash_list': copy(current_hash_list),
                         'threshold_in_concentrations_ratio': rval['threshold_in_concentrations_ratio'],
                         'hard_coded_concentrations_ratio': rval['hard_coded_concentrations_ratio'],
+                        'concentration_of_first_model_is_greater_then_second_model':
+                            rval['concentration_of_first_model_is_greater_then_second_model'],
+                        'concentration_of_second_model_is_greater_then_first_model':
+                            rval['concentration_of_second_model_is_greater_then_first_model'],
                     }
                     if idx_of_new_dict < 2:
                         self.dict_of_hash_list_of_constraints_on_combining_models = dict()
@@ -632,7 +643,7 @@ class MultiGroupCurve(ExtendBase):
     def func_for_optimize(self, x):
         # create function of snapshots linear composition Sum[x_i*F_i]
         num = len(self.group_name_and_mask_linker_dict)
-        x = np.abs(x)
+        # x = np.abs(x)
         old_x = copy(x)
         tmp_y_vector = []
         if self.dict_of_hash_list_of_constraints_on_combining_models is not None:
@@ -640,54 +651,84 @@ class MultiGroupCurve(ExtendBase):
                 if set(dval['model_hash_list']).issubset(self.current_hash_list):
                     idx_model_1 = self.current_hash_list.index(dval['model_hash_list'][0])
                     idx_model_2 = self.current_hash_list.index(dval['model_hash_list'][1])
+                    if dval['concentration_of_first_model_is_greater_then_second_model'] is not None:
+                        if dval['concentration_of_first_model_is_greater_then_second_model']:
+                            if abs(x[idx_model_2]) > abs(x[idx_model_1]):
+                                x[idx_model_2] = self.max_restriction_value
+                                x[idx_model_1] = self.max_restriction_value
+                    if dval['concentration_of_second_model_is_greater_then_first_model'] is not None:
+                        if dval['concentration_of_second_model_is_greater_then_first_model']:
+                            if abs(x[idx_model_1]) > abs(x[idx_model_2]):
+                                x[idx_model_2] = self.max_restriction_value
+                                x[idx_model_1] = self.max_restriction_value
                     if dval['hard_coded_concentrations_ratio'] is not None:
                         if abs(dval['hard_coded_concentrations_ratio']) > 0:
                             if abs(x[idx_model_2]) > 0:
                                 n1_n2 = x[idx_model_1] / x[idx_model_2]
-                                x[idx_model_1] = x[idx_model_2] * dval['hard_coded_concentrations_ratio']
-                                new_n1_n2 = x[idx_model_1] / x[idx_model_2]
-                                logger.info(
-                                    'x1 was changed, old: {}, new: {}, n1/n2_(old) = {}, n1/n2_(new) = {}'.format(
-                                        old_x[idx_model_1], x[idx_model_1], n1_n2, new_n1_n2)
-                                )
+                                if abs(n1_n2 - dval['hard_coded_concentrations_ratio']) > \
+                                        self.epsilon_hard_coded_ratio_threshold:
+                                    # x[idx_model_1] = x[idx_model_2] * dval['hard_coded_concentrations_ratio']
+                                    # logger.info('x={}, n1_n2={}'.format(x, n1_n2))
+                                    # x[:] = self.max_restriction_value
+                                    x[idx_model_1] = self.max_restriction_value
+                                    x[idx_model_2] = self.max_restriction_value / dval['hard_coded_concentrations_ratio']
+                                    # new_n1_n2 = x[idx_model_1] / x[idx_model_2]
+                                    # logger.info(
+                                    #     'x1 was changed, old: {}, new: {}, n1/n2_(old) = {}, n1/n2_(new) = {}'.format(
+                                    #         old_x[idx_model_1], x[idx_model_1], n1_n2, new_n1_n2)
+                                    # )
                             else:
                                 if abs(x[idx_model_1]) > 0:
                                     n2_n1 = x[idx_model_2] / x[idx_model_1]
-                                    x[idx_model_2] = x[idx_model_1] / dval['hard_coded_concentrations_ratio']
-                                    new_n2_n1 = x[idx_model_1] / x[idx_model_2]
-                                    logger.info(
-                                        'x2 was changed, old: {}, new: {}, n1/n2_(old) = {}, n1/n2_(new) = {}'.format(
-                                            old_x[idx_model_2], x[idx_model_2], n2_n1, new_n2_n1)
-                                    )
+                                    if abs(n2_n1 - 1/dval['hard_coded_concentrations_ratio']) > \
+                                            self.epsilon_hard_coded_ratio_threshold:
+                                        # x[idx_model_2] = x[idx_model_1] / dval['hard_coded_concentrations_ratio']
+                                        # logger.info('x={}, n2_n1={}'.format(x, n2_n1))
+                                        x[idx_model_2] = self.max_restriction_value / dval['hard_coded_concentrations_ratio']
+                                        x[idx_model_1] = self.max_restriction_value
+                                        # x[:] = self.max_restriction_value
+                                        # new_n2_n1 = x[idx_model_1] / x[idx_model_2]
+                                        # logger.info(
+                                        #     'x2 was changed, old: {}, new: {}, n1/n2_(old) = {}, n1/n2_(new) = {}'.format(
+                                        #         old_x[idx_model_2], x[idx_model_2], n2_n1, new_n2_n1)
+                                        # )
+                            if all((
+                                    abs(x[idx_model_1]) < self.epsilon_threshold,
+                                    abs(x[idx_model_2]) < self.epsilon_threshold,
+                                    )):
+                                    x[idx_model_2] = self.max_restriction_value / dval['hard_coded_concentrations_ratio']
+                                    x[idx_model_1] = self.max_restriction_value
 
                     if dval['threshold_in_concentrations_ratio'] is not None:
                         if abs(dval['threshold_in_concentrations_ratio']) > 0:
                             if abs(x[idx_model_2]) > 0:
                                 n1_n2 = x[idx_model_1] / x[idx_model_2]
                                 if abs(n1_n2) < dval['threshold_in_concentrations_ratio']:
-                                    x[idx_model_1] = x[idx_model_2] * dval['threshold_in_concentrations_ratio']
-                                    new_n1_n2 = x[idx_model_1] / x[idx_model_2]
-                                    logger.info(
-                                        ':==>  x1 was changed, old: {}, new: {}, n1/n2_(old) = {}, n1/n2_(new) = {'
-                                        '}'.format(
-                                            old_x[idx_model_1],  x[idx_model_1], n1_n2, new_n1_n2)
-                                    )
+                                    # x[idx_model_1] = x[idx_model_2] * dval['threshold_in_concentrations_ratio']
+                                    x[idx_model_1] = self.max_restriction_value
+                                    # new_n1_n2 = x[idx_model_1] / x[idx_model_2]
+                                    # logger.info(
+                                    #     ':==>  x1 was changed, old: {}, new: {}, n1/n2_(old) = {}, n1/n2_(new) = {'
+                                    #     '}'.format(
+                                    #         old_x[idx_model_1],  x[idx_model_1], n1_n2, new_n1_n2)
+                                    # )
 
                             if abs(x[idx_model_1]) > 0:
                                 n2_n1 = x[idx_model_2] / x[idx_model_1]
                                 if abs(n2_n1) < dval['threshold_in_concentrations_ratio']:
-                                    x[idx_model_2] = x[idx_model_1] * dval['threshold_in_concentrations_ratio']
-                                    new_n2_n1 = x[idx_model_1] / x[idx_model_2]
-                                    logger.info(
-                                        ':==>  x2 was changed, old: {}, new: {}, n2/n1_(old) = {}, n2/n1_(new) = {'
-                                        '}'.format(
-                                            old_x[idx_model_2], x[idx_model_2], n2_n1, new_n2_n1)
-                                    )
+                                    # x[idx_model_2] = x[idx_model_1] * dval['threshold_in_concentrations_ratio']
+                                    x[idx_model_2] = self.max_restriction_value
+                                    # new_n2_n1 = x[idx_model_1] / x[idx_model_2]
+                                    # logger.info(
+                                    #     ':==>  x2 was changed, old: {}, new: {}, n2/n1_(old) = {}, n2/n1_(new) = {'
+                                    #     '}'.format(
+                                    #         old_x[idx_model_2], x[idx_model_2], n2_n1, new_n2_n1)
+                                    # )
 
                             if all((x[idx_model_1] == 0, x[idx_model_2] == 0)):
-                                x[idx_model_1] = dval['threshold_in_concentrations_ratio']
-                                x[idx_model_2] = dval['threshold_in_concentrations_ratio']
-                                logger.info('x1 and x2 are changed, old: {}, new: {}'.format(old_x, x))
+                                x[idx_model_1] = self.max_restriction_value
+                                x[idx_model_2] = self.max_restriction_value
+                                # logger.info('x1 and x2 are changed, old: {}, new: {}'.format(old_x, x))
 
 
         sum_x = np.sum(x)
@@ -738,7 +779,7 @@ class MultiGroupCurve(ExtendBase):
         if self.minimization_method == 'minimize':
             res = minimize(func, x0=x0, bounds=bounds, options={'gtol': 1e-8, 'disp': True})
         elif self.minimization_method == 'differential_evolution':
-            res = differential_evolution(func, bounds, tol=1e3)
+            res = differential_evolution(func, bounds, tol=self.minimization_method_tolerance)
 
         if np.sum(res.x) > 0:
             self.current_optimized_params = res.x / np.sum(res.x)
@@ -1005,9 +1046,9 @@ class MultiGroupCurve(ExtendBase):
 
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
-    sample_type = 'ZnO_ref'
+    # sample_type = 'ZnO_ref'
     sample_type = 'YbZnO_5e14'
-    sample_type = 'YbZnO_5e15'
+    # sample_type = 'YbZnO_5e15'
 
     obj = MultiGroupCurve()
     obj.sample_type_name = sample_type
@@ -1072,73 +1113,70 @@ if __name__ == '__main__':
             3: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'YbZnO_5e15-75deg'},
         }
 
-    # add constraints to the combination of models.
-    # Now, if 2 models are in the constraint list, it means that there are only cases in model combinations
-    # where these models meet together or do not occur separately at all.
-    #
-    # setup: model_path_list - paths to models in constraint relationship,
-    # setup: threshold_in_concentrations_ratio - to set threshold of min/max values of concentration ratio between
-    # two models.
-    # Attention: this value might be apply for a constrain case that includes 2 models only. If you set model_path_list
-    # larger then 2 models (3, 4 or larger), you must to set  threshold_in_concentrations_ratio value as None.
-    # setup: hard_coded_concentrations_ratio - for setting a stable concentration ratio between 2 models. Attention:
-    # for 2 models only, otherwise you must ot set this value to None.
-    # obj.dict_of_constrains_on_combining_models = {
-    #     1: { # the first constrain
-    #         'list_of_cut_parts_of_file_name': [
-    #             'Ira',
-    #             'Ira',
-    #         ],
-    #         'model_path_list': [
-    #             '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/O_i-central/',
-    #             '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/Oi+V-Zn/',
-    #         ],
-    #         # min of n(model1)/n(model2) or n(model2)/n(model1) higher then threshold_in_concentrations_ratio. Avoid
-    #         # cases where n(model1)>0 and n(model2)=0 or vice versa.
-    #         'threshold_in_concentrations_ratio': None,
-    #         # n(model1)/n(model2) = hard_coded_concentrations_ratio, if "None" then n can be any
-    #         'hard_coded_concentrations_ratio': None,
-    #     },
-    #     2: { # the second constrain
-    #         'list_of_cut_parts_of_file_name': [
-    #             'Ira',
-    #             'Ira',
-    #         ],
-    #         'model_path_list': [
-    #             '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/',
-    #             '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/O_i-central/',
-    #         ],
-    #         'threshold_in_concentrations_ratio': None,
-    #         'hard_coded_concentrations_ratio': None,
-    #     },
-    #     3: { # the third constrain
-    #         'list_of_cut_parts_of_file_name': [
-    #             'Ira',
-    #             'Ira',
-    #         ],
-    #         'model_path_list': [
-    #             '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis2/',
-    #             '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis2/O_i-dis2-central/',
-    #         ],
-    #         'threshold_in_concentrations_ratio': None,
-    #         'hard_coded_concentrations_ratio': None,
-    #     },
-    #     4: { # the fours constrain
-    #         'list_of_cut_parts_of_file_name': [
-    #             'Ira',
-    #             'Ira',
-    #         ],
-    #         'model_path_list': [
-    #             '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/Oi+V-Zn/',
-    #             '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/Oi+V_Zn-Oi-central/',
-    #         ],
-    #         'threshold_in_concentrations_ratio': 0.0001,
-    #         'hard_coded_concentrations_ratio': 2,
-    #     },
-    #
-    # }
+    """
+    add constraints to the combination of models.
+    Now, if 2 models are in the constraint list, it means that there are only cases in model combinations
+    where these models meet together or do not occur separately at all.
+
+    setup: model_path_list - paths to models in constraint relationship,
+    setup: threshold_in_concentrations_ratio - to set threshold of min/max values of concentration ratio between
+    two models. 
+    Attention: this value might be apply for a constrain case that includes 2 models only. If you set model_path_list
+    larger then 2 models (3, 4 or larger), you must to set  threshold_in_concentrations_ratio value as None.
+
+    setup: hard_coded_concentrations_ratio - for setting a stable concentration ratio between 2 models. Attention:
+    for 2 models only, otherwise you must ot set this value to None.
+    The tolerance for hard_coded_concentrations_ratio value in searching procedure was set 
+    in self.epsilon_hard_coded_ratio_threshold
+    """
+
     obj.dict_of_constrains_on_combining_models = {
-        1: { # the fours constrain
+        1: { # the first constrain
+            'list_of_cut_parts_of_file_name': [
+                'Ira',
+                'Ira',
+            ],
+            'model_path_list': [
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/O_i-central/',
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/Oi+V-Zn/',
+            ],
+            # min of n(model1)/n(model2) or n(model2)/n(model1) higher then threshold_in_concentrations_ratio. Avoid
+            # cases where n(model1)>0 and n(model2)=0 or vice versa.
+            'threshold_in_concentrations_ratio': None,
+            # n(model1)/n(model2) = hard_coded_concentrations_ratio, if "None" then n can be any
+            'hard_coded_concentrations_ratio': None,
+            'concentration_of_first_model_is_greater_then_second_model': None,
+            'concentration_of_second_model_is_greater_then_first_model': None,
+        },
+        2: { # the second constrain
+            'list_of_cut_parts_of_file_name': [
+                'Ira',
+                'Ira',
+            ],
+            'model_path_list': [
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/',
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis1/O_i-central/',
+            ],
+            'threshold_in_concentrations_ratio': None,
+            'hard_coded_concentrations_ratio': None,
+            'concentration_of_first_model_is_greater_then_second_model': None,
+            'concentration_of_second_model_is_greater_then_first_model': None,
+        },
+        3: { # the third constrain
+            'list_of_cut_parts_of_file_name': [
+                'Ira',
+                'Ira',
+            ],
+            'model_path_list': [
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis2/',
+                '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/dis2/O_i-dis2-central/',
+            ],
+            'threshold_in_concentrations_ratio': None,
+            'hard_coded_concentrations_ratio': None,
+            'concentration_of_first_model_is_greater_then_second_model': None,
+            'concentration_of_second_model_is_greater_then_first_model': None,
+        },
+        4: { # the fours constrain
             'list_of_cut_parts_of_file_name': [
                 'Ira',
                 'Ira',
@@ -1147,11 +1185,32 @@ if __name__ == '__main__':
                 '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/Oi+V-Zn/',
                 '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/Oi+V_Zn-Oi-central/',
             ],
-            'threshold_in_concentrations_ratio': 0.0001,
+            'threshold_in_concentrations_ratio': 0.001,
             'hard_coded_concentrations_ratio': None,
+            'concentration_of_first_model_is_greater_then_second_model': None,
+            'concentration_of_second_model_is_greater_then_first_model': None,
         },
 
     }
+
+
+    # obj.dict_of_constrains_on_combining_models = {
+    #     1: { # the fours constrain
+    #         'list_of_cut_parts_of_file_name': [
+    #             'Ira',
+    #             'Ira',
+    #         ],
+    #         'model_path_list': [
+    #             '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/Oi+V-Zn/',
+    #             '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/Oi+V_Zn-Oi-central/',
+    #         ],
+    #         'threshold_in_concentrations_ratio': 1e-3,
+    #         'hard_coded_concentrations_ratio': None,
+    #         'concentration_of_first_model_is_greater_then_second_model': None,
+    #         'concentration_of_second_model_is_greater_then_first_model': None,
+    #     },
+    #
+    # }
 
     obj.models_black_list = (
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/',
