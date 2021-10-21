@@ -369,14 +369,17 @@ def filter_list_of_tuples_by_list_of_key_lists(input_list_of_tuples=None, key_li
     :return:
     '''
     out = []
-    if input_list_of_tuples is not None and key_lists is not None:
-        uniq_keys = np.unique(key_lists)
-        for tuple_val in input_list_of_tuples:
-            if is_keys_from_the_key_list_always_have_a_pair_in_the_input_tuple(
-                    input_tuple=tuple_val, key_lists=key_lists
-            ):
-                # append only when tmp_tuple_list has some value:
-                out.append(tuple_val)
+    if input_list_of_tuples is not None:
+        if key_lists is not None:
+            uniq_keys = np.unique(key_lists)
+            for tuple_val in input_list_of_tuples:
+                if is_keys_from_the_key_list_always_have_a_pair_in_the_input_tuple(
+                        input_tuple=tuple_val, key_lists=key_lists
+                ):
+                    # append only when tmp_tuple_list has some value:
+                    out.append(tuple_val)
+        else:
+            out = input_list_of_tuples
     return out
 
 

@@ -284,7 +284,11 @@ class MultiGroupCurve(ExtendBase):
                         group_name_and_mask_dict=self.group_name_and_mask_linker_dict,
                         path_level=1,
                     )
-                    current_hash_list.append(spectra_dict[0]['model_hash'])
+                    try:
+                        current_hash_list.append(spectra_dict[0]['model_hash'])
+                    except Exception as err:
+                        logger.info('Something goes wrong in models in list of constrains')
+                        logger.info(err)
                 out.append(current_hash_list)
                 # extended_dict_of_constrains_on_combining_models[rkey]['model_hash_list'] = copy(current_hash_list)
                 self.dict_of_constrains_on_combining_models[rkey]['model_hash_list'] = copy(current_hash_list)
@@ -588,6 +592,7 @@ class MultiGroupCurve(ExtendBase):
             tmp_hash_list.sort()
             result_hash_list.append(tmp_hash_list)
 
+        result_hash_list = [get_list_without_duplicates(x) for x in result_hash_list]
         result_hash_list_combinations = list(itertools.product(*result_hash_list))
         logger.info(len(result_hash_list_combinations))
 
@@ -959,6 +964,7 @@ class MultiGroupCurve(ExtendBase):
 
             header_txt = header_txt + 'list of theoretical spectra models involved in fitting procedure:\n'
             for val in self.list_of_all_unique_hashes_from_all_directories:
+                # print(f'{val=}')
                 header_txt += '\t' \
                               + '[{}]'.format(val) \
                               + ' <=> '\
@@ -1046,8 +1052,8 @@ class MultiGroupCurve(ExtendBase):
 
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
-    # sample_type = 'ZnO_ref'
-    sample_type = 'YbZnO_5e14'
+    sample_type = 'ZnO_ref'
+    # sample_type = 'YbZnO_5e14'
     # sample_type = 'YbZnO_5e15'
 
     obj = MultiGroupCurve()
@@ -1090,6 +1096,14 @@ if __name__ == '__main__':
         #     1: {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'ZnO-45deg'},
         #     2: {'name': '75 deg', 'mask': '0.2679 0 1', 'experiment_name_mask': 'ZnO-75deg'},
         # }
+
+
+    '''
+    Be careful!!!
+    Do not use any mask-name in model name. Ex. avoid folder_name like: 4V_Zn+1V_O_complex_aver_12-O because we have 
+    group name with key "mask" equal to word 'aver'
+    {'name': '45 deg', 'mask': 'aver', 'experiment_name_mask': 'YbZnO_5e14-45deg'}
+    '''
 
     if sample_type == 'YbZnO_5e14':
         obj.group_name_and_mask_linker_dict = {
@@ -1214,11 +1228,12 @@ if __name__ == '__main__':
 
     obj.models_black_list = (
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/ZnO+1O_oct/',
+        '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/Oi+V-Zn/',
     )
 
     pprint(obj.dict_of_constrains_on_combining_models)
 
-    obj.number_of_curve_directory_paths_for_fit = 5
+    obj.number_of_curve_directory_paths_for_fit = 6
     Configuration.init()
 
     obj.setup_axes()
