@@ -514,8 +514,80 @@ def remove_duplicates_from_list_of_tuples(lst):
     return [t for t in (set(tuple(sorted(i)) for i in lst))]
 
 
+def generate_list_of_lists_with_possible_uniq_combinations_from_input_list_of_lists(input_list_of_lists=None,
+                                                                                    marked_number=None):
+    '''
+    input_list = [
+    [1, 2, ],
+    [1, 2, 3, 4, 5],
+    ]
+    :return:
+    out= [[1, 2], [2, 1], [3, 1], [3, 2], [4, 1], [4, 2], [5, 1], [5, 2]]
+    '''
+    out = None
+    # logger.info(len(input_list_of_lists))
+    # logger.info(input_list_of_lists)
+    if input_list_of_lists is not None:
+        if len(input_list_of_lists) > 1:
+            out = []
+            current_list = input_list_of_lists.pop()
+            inner_level_list = generate_list_of_lists_with_possible_uniq_combinations_from_input_list_of_lists(input_list_of_lists)
+            if current_list is not None:
+                if len(current_list) > 0:
+                    for val in current_list:
+                        if val is not None:
+                            for inner_val in inner_level_list:
+                                if val not in inner_val:
+                                    # print()
+                                    prepared_list = [val, *inner_val]
+                                    if prepared_list not in out:
+                                        out.append(prepared_list)
+        elif len(input_list_of_lists) == 1:
+            out = [[x] for x in input_list_of_lists[0]]
+    return out
+
+
+def generate_list_of_tuples_with_possible_uniq_combinations_from_input_list_of_lists(input_list_of_lists=None):
+    '''
+    input_list = [
+    [1, 2, ],
+    [1, 2, 3, 4, 5],
+    ]
+    :return:
+    out= [(1, 2), (2, 1), (3, 1), (3, 2), (4, 1), (4, 2), (5, 1), (5, 2)]
+    '''
+    out = None
+    if input_list_of_lists is not None:
+        out_lst = generate_list_of_lists_with_possible_uniq_combinations_from_input_list_of_lists(input_list_of_lists)
+        out = [tuple(x) for x in out_lst]
+    return out
+
+
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
+    lst = [x for x in range(15) if x > 0]
+    # input_list = [
+    # # [1, 2, 3, 4, 5],
+    # # [1, 2, 3, 4, 5, 6],
+    # [1, 2, ],
+    # [1, 2, 3, 4, 5],
+    # ]
+    input_list = [
+        lst,
+        lst,
+        lst,
+        lst,
+        lst,
+        lst,
+    ]
+
+    # out_lst = generate_list_of_lists_with_possible_uniq_combinations_from_input_list_of_lists(input_list)
+    # pprint(out_lst)
+    out_tuples = generate_list_of_tuples_with_possible_uniq_combinations_from_input_list_of_lists(input_list)
+    pprint(out_tuples)
+    out_tuples_without_duplicates = remove_duplicates_from_list_of_tuples(out_tuples)
+    pprint(out_tuples_without_duplicates)
+
     out = load_filenames_of_feff_spectra_recursively_in_dir(
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/')
     for val in out:

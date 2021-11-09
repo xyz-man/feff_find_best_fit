@@ -6,6 +6,12 @@
 
 from pkg_lib.pkg_bases.class_multicurve import *
 from pkg_lib.pkg_cfg.class_configure import Configuration
+from pkg_lib.pkg_files.load_list_of_feff_files import \
+    generate_list_of_tuples_with_possible_uniq_combinations_from_input_list_of_lists
+import progressbar
+from alive_progress import alive_bar
+import time
+from tqdm.asyncio import tqdm
 
 
 class MultiGroupCurve(ExtendBase):
@@ -51,10 +57,11 @@ class MultiGroupCurve(ExtendBase):
 
         self.list_of_hash_combinations = None
         self.minimization_method = 'differential_evolution'
-        self.minimization_method_tolerance = 1e-6
+        self.minimization_method_tolerance = 1e-8
         # self.minimization_method = 'minimize'
         # variables for processing for each step of calculations:
         self.current_hash_list = None
+        self.current_metamodel_number = None
         self.current_group_id = None
         self.current_group_name = None
 
@@ -593,6 +600,9 @@ class MultiGroupCurve(ExtendBase):
             result_hash_list.append(tmp_hash_list)
 
         result_hash_list = [get_list_without_duplicates(x) for x in result_hash_list]
+
+        # result_hash_list_combinations = \
+        #     generate_list_of_tuples_with_possible_uniq_combinations_from_input_list_of_lists(result_hash_list)
         result_hash_list_combinations = list(itertools.product(*result_hash_list))
         logger.info(len(result_hash_list_combinations))
 
@@ -802,67 +812,95 @@ class MultiGroupCurve(ExtendBase):
         pprint_width = Configuration.HASH_LENGTH*self.number_of_curve_directory_paths_for_fit + 40
         pprint(self.list_of_hash_combinations,
                width=pprint_width)
-        for num, val_lst in enumerate(self.list_of_hash_combinations):
-            self.current_hash_list = val_lst
-            self.run_fit_procedure_for_current_values()
-            if self.is_global_minimum_r_factor():
-                tmp_dict = odict()
-                tmp_dict['r_factor'] = deepcopy(self.current_r_factor_dict)
-                tmp_dict['sigma_squared'] = deepcopy(self.current_sigma_squared_dict)
-                tmp_dict['hash_list'] = deepcopy(self.current_hash_list)
-                tmp_dict['optimized_params'] = deepcopy(self.current_optimized_params)
-                tmp_dict['x_coordinates'] = deepcopy(self.experimental_curve.src_coordinate.x)
-                tmp_dict['theoretical_y_coordinates'] = deepcopy(self.current_dict_of_result_of_theoretical_y_coordinates)
-                tmp_dict['theoretical_y_coordinates_in_r_factor_region'] = \
-                    deepcopy(self.current_dict_of_result_of_theoretical_y_coordinates_in_r_factor_region)
+        tot_len = len(self.list_of_hash_combinations)
+        # pbar = progressbar.ProgressBar(
+        #     maxval=len(self.list_of_hash_combinations),
+        #     min_value=1,
+        #     initial_value=1,
+        #     widgets=[progressbar.Bar('=', '[', ']'), ' ',
+        #              progressbar.Percentage()]
+        # )
+        # pbar.start()
 
-                self.dict_of_results[num] = tmp_dict
 
-                # write Title:
-                self.current_title_txt = 'Total values: $\\mathbf{{R}}$={rf:1.7f}, $\\mathbf{{' \
-                                         '\sigma^2}}$={sq:1.7f}\n'.format(
-                    rf=self.current_r_factor_dict['total'],
-                    sq=self.current_sigma_squared_dict['total'],
-                )
-                self.figure.suptitle(self.current_title_txt, fontsize=20)
-                # plot curves
-                self.clear_all_axes()
-                for group_key, val in self.group_name_and_mask_linker_dict.items():
-                    self.current_txt = '$\\mathbf{{{}}}$ : '.format(val['name'])
-                    self.current_txt += 'R={rf:1.7f}, $\sigma^2$={sq:1.7f}\n'.format(
-                        rf=self.current_r_factor_dict[group_key],
-                        sq=self.current_sigma_squared_dict[group_key],
+        # to enable interactive terminal in pycharm: You can use built-in terminal or enabled tty support via
+        # Registry (Ctrl+Alt+Shift+/ | Registry | run.processes.with.pty)
+
+        # with alive_bar(tot_len, force_tty=False) as bar:
+        with tqdm(total=tot_len) as pbar:
+            for num, val_lst in enumerate(self.list_of_hash_combinations):
+                self.current_hash_list = val_lst
+                self.current_metamodel_number = num+1
+                # pbar.update(num+1)
+                pbar.update()
+                self.run_fit_procedure_for_current_values()
+                if self.is_global_minimum_r_factor():
+                    tmp_dict = odict()
+                    # number of current hash combination in  self.list_of_hash_combinations:
+                    tmp_dict['metamodel_number'] = deepcopy(self.current_metamodel_number)
+                    tmp_dict['r_factor'] = deepcopy(self.current_r_factor_dict)
+                    tmp_dict['sigma_squared'] = deepcopy(self.current_sigma_squared_dict)
+                    tmp_dict['hash_list'] = deepcopy(self.current_hash_list)
+                    tmp_dict['optimized_params'] = deepcopy(self.current_optimized_params)
+                    tmp_dict['x_coordinates'] = deepcopy(self.experimental_curve.src_coordinate.x)
+                    tmp_dict['theoretical_y_coordinates'] = deepcopy(self.current_dict_of_result_of_theoretical_y_coordinates)
+                    tmp_dict['theoretical_y_coordinates_in_r_factor_region'] = \
+                        deepcopy(self.current_dict_of_result_of_theoretical_y_coordinates_in_r_factor_region)
+
+                    self.dict_of_results[num] = tmp_dict
+
+                    # write Title:
+                    self.current_title_txt = 'Total values: $\\mathbf{{R}}$={rf:1.7f}, ' \
+                                             '$\\mathbf{{' \
+                                             '\sigma^2}}$={sq:1.7f}, Metamodel=$\\mathbf{{{mn}}}/\\mathbb{{{ln}}}$ ' \
+                                             '\n'.\
+                        format(
+                        rf=self.current_r_factor_dict['total'],
+                        sq=self.current_sigma_squared_dict['total'],
+                        mn=self.current_metamodel_number,
+                        ln=len(self.list_of_hash_combinations),
                     )
-                    self.current_label = ''
-                    self.experimental_curve = self.dict_of_experimental_curves_separated_by_groups[group_key][
-                        'experimental_curve']
-                    self.experimental_curve.axes = self.axes[group_key - 1 + len(self.group_name_and_mask_linker_dict)]
-                    self.experimental_curve.plot_curve()
-                    for i, hs in enumerate(self.current_hash_list):
-                        current_dict_of_curve_group = self.get_dict_of_groups_of_curves_by_hash(hs)[group_key]
-                        current_curve = current_dict_of_curve_group['theoretical_curve']
-                        # generate txt string:
-                        self.current_label = self.current_label + '{0} x [ '.format(
-                            round(self.current_optimized_params[i], 5)
-                        ) + current_dict_of_curve_group['name'] + ' ]'
-                        if i < len(self.current_optimized_params) - 1:
-                            self.current_label = self.current_label + ' + \n'
-                        current_curve.axes = self.axes[group_key - 1 + len(self.group_name_and_mask_linker_dict)]
-                        plt.axes(current_curve.axes)
-                        # init experimental curve for current group:
-                        current_curve.plot_curve()
-                        # self.experimental_curve.is_src_plotted = True
+                    self.figure.suptitle(self.current_title_txt, fontsize=20)
+                    # plot curves
+                    self.clear_all_axes()
+                    for group_key, val in self.group_name_and_mask_linker_dict.items():
+                        self.current_txt = '$\\mathbf{{{}}}$ : '.format(val['name'])
+                        self.current_txt += 'R={rf:1.7f}, $\sigma^2$={sq:1.7f}\n'.format(
+                            rf=self.current_r_factor_dict[group_key],
+                            sq=self.current_sigma_squared_dict[group_key],
+                        )
+                        self.current_label = ''
+                        self.experimental_curve = self.dict_of_experimental_curves_separated_by_groups[group_key][
+                            'experimental_curve']
+                        self.experimental_curve.axes = self.axes[group_key - 1 + len(self.group_name_and_mask_linker_dict)]
+                        self.experimental_curve.plot_curve()
+                        for i, hs in enumerate(self.current_hash_list):
+                            current_dict_of_curve_group = self.get_dict_of_groups_of_curves_by_hash(hs)[group_key]
+                            current_curve = current_dict_of_curve_group['theoretical_curve']
+                            # generate txt string:
+                            self.current_label = self.current_label + '{0} x [ '.format(
+                                round(self.current_optimized_params[i], 5)
+                            ) + current_dict_of_curve_group['name'] + ' ]'
+                            if i < len(self.current_optimized_params) - 1:
+                                self.current_label = self.current_label + ' + \n'
+                            current_curve.axes = self.axes[group_key - 1 + len(self.group_name_and_mask_linker_dict)]
+                            plt.axes(current_curve.axes)
+                            # init experimental curve for current group:
+                            current_curve.plot_curve()
+                            # self.experimental_curve.is_src_plotted = True
+                            plt.legend()
+                            plt.grid(True)
+                            plt.draw()
+                            plt.show()
+                        self.plot_fit_resulted_for_current_group_of_curves(group_id=group_key)
                         plt.legend()
-                        plt.grid(True)
                         plt.draw()
                         plt.show()
-                    self.plot_fit_resulted_for_current_group_of_curves(group_id=group_key)
-                    plt.legend()
-                    plt.draw()
-                    plt.show()
 
-                # self.current_txt = self.current_txt + self.current_label
-                self.save_current_curves_to_ascii_and_png_files()
+                    # self.current_txt = self.current_txt + self.current_label
+                    self.save_current_curves_to_ascii_and_png_files()
+
+        # pbar.finish()
         # copy the global minimum files into up directory:
         if self.current_out_file_name is not None:
             source = self.current_out_directory_name
@@ -945,7 +983,8 @@ class MultiGroupCurve(ExtendBase):
                 self.r_factor_region[0],
                 self.r_factor_region[1],
             )
-            header_txt = header_txt + 'minimization method: {}, number of fit models: {}, number of groups: {}\n'.format(
+            header_txt = header_txt + 'minimization method: {}, number of fit models (metamodel length): {}, ' \
+                                      'number of groups: {}\n'.format(
                 self.minimization_method,
                 self.number_of_curve_directory_paths_for_fit,
                 len(self.group_name_and_mask_linker_dict),
@@ -962,22 +1001,28 @@ class MultiGroupCurve(ExtendBase):
                     header_txt = header_txt + 'list of models in black list:\n'
                     header_txt += pformat(self.models_black_list) + '\n'*2
 
-            header_txt = header_txt + 'list of theoretical spectra models involved in fitting procedure:\n'
-            for val in self.list_of_all_unique_hashes_from_all_directories:
+            header_txt = header_txt + \
+                         'list of theoretical spectra models involved in fitting procedure [N={}]:\n'.format(
+                             len(self.list_of_all_unique_hashes_from_all_directories)
+                         )
+            for i_num, val in enumerate(self.list_of_all_unique_hashes_from_all_directories):
                 # print(f'{val=}')
                 header_txt += '\t' \
-                              + '[{}]'.format(val) \
+                              + '{} : [{}]'.format(i_num, val) \
                               + ' <=> '\
                               + self.get_dict_of_groups_of_curves_by_hash(val)[1]['model_name'] \
                               + ' <=> '\
                               + self.get_dict_of_groups_of_curves_by_hash(val)[1]['model_path'] \
                               + '\n'
 
-            header_txt = header_txt + 'Models hash list after constraints filtering [N={}]: :\n'.format(
+            header_txt = header_txt + '\nMetamodels hash list after constraints filtering [N={}]:\n'.format(
                 len(self.list_of_hash_combinations)
             )
             for num, val in enumerate(self.list_of_hash_combinations):
-                header_txt += '\t' + '{} : {}'.format(num+1, val) + '\n'
+                if num == self.current_metamodel_number - 1:
+                    header_txt += '\t' + '-> {} : {}'.format(num+1, val) + '\n'
+                else:
+                    header_txt += '\t' + '   {} : {}'.format(num+1, val) + '\n'
 
             columns_name_txt = 'Energy(eV)\tRaw:[{exper}]\tRaw R-region: [{exper}]\tTotal:[{exper}] [{num} models ' \
                                'fit]\tTotal:[{exper}] R-region: [{num} models fit]'.format(
@@ -985,6 +1030,7 @@ class MultiGroupCurve(ExtendBase):
                 num=self.number_of_curve_directory_paths_for_fit,
             )
 
+            header_txt += '\nBest result has been found for Metamodel N={} \n'.format(self.current_metamodel_number+1)
             header_txt += '\ncoefficients in exponential form :\n'
             current_label = ''
             for i, hs in enumerate(self.current_hash_list):
@@ -1053,8 +1099,8 @@ class MultiGroupCurve(ExtendBase):
 if __name__ == '__main__':
     print('-> you run ', __file__, ' file in the main mode (Top-level script environment)')
     sample_type = 'ZnO_ref'
-    # sample_type = 'YbZnO_5e14'
-    # sample_type = 'YbZnO_5e15'
+    sample_type = 'YbZnO_5e14'
+    sample_type = 'YbZnO_5e15'
 
     obj = MultiGroupCurve()
     obj.sample_type_name = sample_type
@@ -1065,8 +1111,14 @@ if __name__ == '__main__':
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
         '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
+        '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
+        '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
+        '/home/yugin/PycharmProjects/feff_find_best_fit/data/tmp_theoretical/Ira/',
     ]
     obj.list_of_cut_parts_of_file_name = [
+        'Ira',
+        'Ira',
+        'Ira',
         'Ira',
         'Ira',
         'Ira',
@@ -1233,7 +1285,7 @@ if __name__ == '__main__':
 
     pprint(obj.dict_of_constrains_on_combining_models)
 
-    obj.number_of_curve_directory_paths_for_fit = 6
+    obj.number_of_curve_directory_paths_for_fit = 7
     Configuration.init()
 
     obj.setup_axes()

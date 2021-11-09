@@ -44,7 +44,8 @@ class Configuration:
     STORED_VARIABLES_OF_THEORETICAL_CALCULATED_SPECTRA_FILE_NAME = 'vars_configuration.pckl'
 
     DPI = plt.rcParams['figure.dpi'] #get the default dpi value
-    FIGURE_GEOMETRY = (1920, 20, 1920, 1080)
+    # FIGURE_GEOMETRY = (1920, 20, 1920, 1080)
+    FIGURE_GEOMETRY = (1920, 20, 2560, 1440)
     FONTSIZE_Y_LABEL = 14
     FONTSIZE_X_LABEL = 14
 
